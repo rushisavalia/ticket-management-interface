@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Search, RefreshCw } from 'lucide-react';
+import { AlertCircle, RefreshCw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface Ticket {
@@ -36,16 +36,13 @@ interface Contact {
   tourId: string;
   email: string;
   phone: string;
-  address: string;
 }
 
 interface CancellationPolicy {
   id: string;
   vendorId: string;
   tourId: string;
-  policy: string;
-  refundPercentage: number;
-  cancellationWindow: number;
+  cancellationBeforeMinutes: number;
 }
 
 const API_BASE = 'https://my-json-server.typicode.com/neelbakshi94/test-plc';
@@ -55,12 +52,13 @@ const TicketDashboard = () => {
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [tours, setTours] = useState<Tour[]>([]);
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
   const [contact, setContact] = useState<Contact | null>(null);
   const [cancellationPolicy, setCancellationPolicy] = useState<CancellationPolicy | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isAddedToVendorTour, setIsAddedToVendorTour] = useState(false);
+  const [showContactForm, setShowContactForm] = useState(false);
+  const [showCancellationForm, setShowCancellationForm] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -103,62 +101,6 @@ const TicketDashboard = () => {
     }
   };
 
-  const fetchContactAndPolicy = async () => {
-    if (!selectedTicket) return;
-
-    setIsLoading(true);
-    console.log('Fetching contact and policy for ticket:', selectedTicket.id);
-    try {
-      const [contactRes, policyRes] = await Promise.all([
-        fetch(`${API_BASE}/contact`),
-        fetch(`${API_BASE}/cancellationPolicy`)
-      ]);
-
-      if (!contactRes.ok || !policyRes.ok) {
-        throw new Error('Failed to fetch contact and policy data');
-      }
-
-      const [contactData, policyData] = await Promise.all([
-        contactRes.json(),
-        policyRes.json()
-      ]);
-
-      console.log('Contact data:', contactData);
-      console.log('Policy data:', policyData);
-
-      // Find matching contact and policy by vendorId and tourId
-      const matchingContact = contactData.find((c: Contact) => 
-        c.vendorId === selectedTicket.vendorId && c.tourId === selectedTicket.tourId
-      );
-      const matchingPolicy = policyData.find((p: CancellationPolicy) => 
-        p.vendorId === selectedTicket.vendorId && p.tourId === selectedTicket.tourId
-      );
-
-      setContact(matchingContact || {
-        id: '',
-        vendorId: selectedTicket.vendorId,
-        tourId: selectedTicket.tourId,
-        email: '',
-        phone: '',
-        address: ''
-      });
-      setCancellationPolicy(matchingPolicy || {
-        id: '',
-        vendorId: selectedTicket.vendorId,
-        tourId: selectedTicket.tourId,
-        policy: '',
-        refundPercentage: 0,
-        cancellationWindow: 24
-      });
-      setError(null);
-    } catch (err) {
-      console.error('Error fetching contact and policy:', err);
-      setError('Failed to fetch contact and cancellation policy');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const addToVendorTour = async () => {
     if (!selectedTicket) return;
 
@@ -190,6 +132,77 @@ const TicketDashboard = () => {
     } catch (err) {
       console.error('Error adding to vendor tours:', err);
       setError('Failed to add to vendor tours');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const fetchContactInfo = async () => {
+    if (!selectedTicket) return;
+
+    setIsLoading(true);
+    console.log('Fetching contact info for ticket:', selectedTicket.id);
+    try {
+      const contactRes = await fetch(`${API_BASE}/contact`);
+
+      if (!contactRes.ok) {
+        throw new Error('Failed to fetch contact data');
+      }
+
+      const contactData = await contactRes.json();
+      console.log('Contact data:', contactData);
+
+      const matchingContact = contactData.find((c: Contact) => 
+        c.vendorId === selectedTicket.vendorId && c.tourId === selectedTicket.tourId
+      );
+
+      setContact(matchingContact || {
+        id: '',
+        vendorId: selectedTicket.vendorId,
+        tourId: selectedTicket.tourId,
+        email: '',
+        phone: ''
+      });
+      setShowContactForm(true);
+      setError(null);
+    } catch (err) {
+      console.error('Error fetching contact:', err);
+      setError('Failed to fetch contact information');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const fetchCancellationPolicy = async () => {
+    if (!selectedTicket) return;
+
+    setIsLoading(true);
+    console.log('Fetching cancellation policy for ticket:', selectedTicket.id);
+    try {
+      const policyRes = await fetch(`${API_BASE}/cancellationPolicy`);
+
+      if (!policyRes.ok) {
+        throw new Error('Failed to fetch policy data');
+      }
+
+      const policyData = await policyRes.json();
+      console.log('Policy data:', policyData);
+
+      const matchingPolicy = policyData.find((p: any) => 
+        p.vendorId === selectedTicket.vendorId && p.tourId === selectedTicket.tourId
+      );
+
+      setCancellationPolicy(matchingPolicy || {
+        id: '',
+        vendorId: selectedTicket.vendorId,
+        tourId: selectedTicket.tourId,
+        cancellationBeforeMinutes: 0
+      });
+      setShowCancellationForm(true);
+      setError(null);
+    } catch (err) {
+      console.error('Error fetching cancellation policy:', err);
+      setError('Failed to fetch cancellation policy');
     } finally {
       setIsLoading(false);
     }
@@ -257,11 +270,6 @@ const TicketDashboard = () => {
     }
   };
 
-  // Fixed the filter function to use productName instead of name and added null checks
-  const filteredTickets = tickets.filter(ticket =>
-    ticket.productName && ticket.productName.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
   const selectedVendor = vendors.find(v => v.id === selectedTicket?.vendorId);
   const selectedTour = tours.find(t => t.id === selectedTicket?.tourId);
 
@@ -269,22 +277,25 @@ const TicketDashboard = () => {
     setError(null);
     if (!selectedTicket) {
       fetchInitialData();
-    } else {
-      fetchContactAndPolicy();
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-7xl mx-auto space-y-6">
-        {/* Header */}
-        <div className="bg-white rounded-lg shadow-sm border p-6">
-          <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-white border-b border-gray-200 px-6 py-4">
+        <div className="max-w-6xl mx-auto flex justify-between items-center">
+          <h1 className="text-xl font-medium text-gray-900">Headout</h1>
+          <div className="bg-gray-100 px-4 py-2 rounded-md">
+            <span className="text-sm font-medium text-gray-700">Dashboard</span>
+          </div>
         </div>
+      </div>
 
+      <div className="max-w-6xl mx-auto p-6">
         {/* Error Section */}
         {error && (
-          <Alert variant="destructive">
+          <Alert variant="destructive" className="mb-6">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription className="flex items-center justify-between">
               <span>{error}</span>
@@ -301,172 +312,191 @@ const TicketDashboard = () => {
           </Alert>
         )}
 
-        {/* Ticket Selection */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Select Ticket</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex gap-4">
-              <div className="flex-1">
-                <Select onValueChange={(value) => {
-                  const ticket = tickets.find(t => t.id === value);
-                  console.log('Selected ticket:', ticket);
-                  setSelectedTicket(ticket || null);
-                  setContact(null);
-                  setCancellationPolicy(null);
-                  setIsAddedToVendorTour(false);
-                }}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a ticket" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {filteredTickets.map((ticket) => (
-                      <SelectItem key={ticket.id} value={ticket.id}>
-                        {ticket.productName} - {ticket.listingType}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex-1 relative">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                <Input
-                  placeholder="Search tickets..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
+        {/* Main Content Card */}
+        <Card className="bg-white">
+          <CardContent className="p-8 space-y-8">
+            {/* Ticket Selection */}
+            <div>
+              <Label htmlFor="ticket-select" className="text-base font-medium text-gray-900 mb-3 block">
+                Ticket :
+              </Label>
+              <Select onValueChange={(value) => {
+                const ticket = tickets.find(t => t.id === value);
+                console.log('Selected ticket:', ticket);
+                setSelectedTicket(ticket || null);
+                setContact(null);
+                setCancellationPolicy(null);
+                setIsAddedToVendorTour(false);
+                setShowContactForm(false);
+                setShowCancellationForm(false);
+              }}>
+                <SelectTrigger className="max-w-md">
+                  <SelectValue placeholder="Select a ticket" />
+                </SelectTrigger>
+                <SelectContent>
+                  {tickets.map((ticket) => (
+                    <SelectItem key={ticket.id} value={ticket.id}>
+                      {ticket.productName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
+
+            {/* Ticket Info */}
+            {selectedTicket && (
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Ticket Name</h3>
+                <p className="text-sm text-gray-600">
+                  {selectedTicket.productName}, {selectedVendor?.name}, {selectedTour?.name}, {selectedTicket.listingType.replace('_', ' ')}
+                </p>
+              </div>
+            )}
+
+            {/* Actions */}
+            {selectedTicket && (
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Actions</h3>
+                <div className="flex gap-3">
+                  {selectedTicket.listingType === 'multi_variant' && !isAddedToVendorTour && (
+                    <Button
+                      onClick={addToVendorTour}
+                      disabled={isLoading}
+                      className="bg-green-600 hover:bg-green-700 text-white"
+                    >
+                      {isLoading ? 'Adding...' : 'Add to Vendor Tours'}
+                    </Button>
+                  )}
+
+                  {(selectedTicket.listingType === 'new_listing' || 
+                    (selectedTicket.listingType === 'multi_variant' && isAddedToVendorTour)) && (
+                    <>
+                      <Button
+                        onClick={fetchContactInfo}
+                        disabled={isLoading}
+                        variant="outline"
+                        className="border-gray-300"
+                      >
+                        {isLoading ? 'Fetching...' : 'Fetch Contact Info'}
+                      </Button>
+                      <Button
+                        onClick={fetchCancellationPolicy}
+                        disabled={isLoading}
+                        variant="outline"
+                        className="border-gray-300"
+                      >
+                        {isLoading ? 'Fetching...' : 'Fetch Cancellation Policy'}
+                      </Button>
+                      <Button
+                        onClick={() => {
+                          updateContact();
+                          updateCancellationPolicy();
+                        }}
+                        disabled={isLoading || (!showContactForm && !showCancellationForm)}
+                        className="bg-gray-600 hover:bg-gray-700 text-white"
+                      >
+                        {isLoading ? 'Updating...' : 'Update'}
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Contact Info & Cancellation Policy */}
+            {(showContactForm || showCancellationForm) && (
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-6">Contact Info & Cancellation Policy</h3>
+                
+                {/* Display current info */}
+                {(contact || cancellationPolicy) && (
+                  <div className="grid grid-cols-3 gap-8 mb-6">
+                    {contact && (
+                      <>
+                        <div>
+                          <Label className="text-sm text-gray-600">Phone</Label>
+                          <p className="text-sm font-medium text-gray-900">{contact.phone || 'Not available'}</p>
+                        </div>
+                        <div>
+                          <Label className="text-sm text-gray-600">Email</Label>
+                          <p className="text-sm font-medium text-gray-900">{contact.email || 'Not available'}</p>
+                        </div>
+                      </>
+                    )}
+                    {cancellationPolicy && (
+                      <div>
+                        <Label className="text-sm text-gray-600">Cancellation Policy</Label>
+                        <p className="text-sm font-medium text-gray-900">
+                          {cancellationPolicy.cancellationBeforeMinutes ? 
+                            `${cancellationPolicy.cancellationBeforeMinutes} mins` : 
+                            'Not available'
+                          }
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Edit forms */}
+                <div>
+                  <h4 className="text-base font-medium text-gray-900 mb-4">Edit</h4>
+                  <div className="space-y-6">
+                    {contact && (
+                      <>
+                        <div>
+                          <Label htmlFor="phone" className="text-sm font-medium text-gray-700">Phone</Label>
+                          <Input
+                            id="phone"
+                            value={contact.phone}
+                            onChange={(e) => setContact({...contact, phone: e.target.value})}
+                            className="mt-1 max-w-md"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="email" className="text-sm font-medium text-gray-700">Email</Label>
+                          <Input
+                            id="email"
+                            type="email"
+                            value={contact.email}
+                            onChange={(e) => setContact({...contact, email: e.target.value})}
+                            className="mt-1 max-w-md"
+                          />
+                        </div>
+                      </>
+                    )}
+                    {cancellationPolicy && (
+                      <div>
+                        <Label htmlFor="cancellationPolicy" className="text-sm font-medium text-gray-700">Cancellation Policy</Label>
+                        <Input
+                          id="cancellationPolicy"
+                          type="number"
+                          value={cancellationPolicy.cancellationBeforeMinutes}
+                          onChange={(e) => setCancellationPolicy({
+                            ...cancellationPolicy, 
+                            cancellationBeforeMinutes: Number(e.target.value)
+                          })}
+                          className="mt-1 max-w-md"
+                          placeholder="Minutes before cancellation"
+                        />
+                      </div>
+                    )}
+                  </div>
+                  
+                  <Button 
+                    onClick={() => {
+                      if (contact) updateContact();
+                      if (cancellationPolicy) updateCancellationPolicy();
+                    }}
+                    disabled={isLoading}
+                    className="mt-6 bg-green-600 hover:bg-green-700 text-white"
+                  >
+                    {isLoading ? 'Submitting...' : 'Submit'}
+                  </Button>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
-
-        {/* Ticket Info */}
-        {selectedTicket && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Ticket Information</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <div><strong>Name:</strong> {selectedTicket.productName}</div>
-              <div><strong>Vendor:</strong> {selectedVendor?.name || 'Unknown'}</div>
-              <div><strong>Tour:</strong> {selectedTour?.name || 'Unknown'}</div>
-              <div><strong>Listing Type:</strong> {selectedTicket.listingType}</div>
-              <div><strong>Status:</strong> {selectedTicket.status || 'N/A'}</div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Actions Section */}
-        {selectedTicket && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Actions</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {selectedTicket.listingType === 'multi_variant' && !isAddedToVendorTour && (
-                <Button
-                  onClick={addToVendorTour}
-                  disabled={isLoading}
-                  className="w-full"
-                >
-                  {isLoading ? 'Adding...' : 'Add to VendorTour'}
-                </Button>
-              )}
-
-              {(selectedTicket.listingType === 'new_listing' || 
-                (selectedTicket.listingType === 'multi_variant' && isAddedToVendorTour)) && (
-                <Button
-                  onClick={fetchContactAndPolicy}
-                  disabled={isLoading}
-                  variant="outline"
-                  className="w-full"
-                >
-                  {isLoading ? 'Fetching...' : 'Fetch Contact & Cancellation Data'}
-                </Button>
-              )}
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Contact Form */}
-        {contact && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Contact Information</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  value={contact.email}
-                  onChange={(e) => setContact({...contact, email: e.target.value})}
-                />
-              </div>
-              <div>
-                <Label htmlFor="phone">Phone</Label>
-                <Input
-                  id="phone"
-                  value={contact.phone}
-                  onChange={(e) => setContact({...contact, phone: e.target.value})}
-                />
-              </div>
-              <div>
-                <Label htmlFor="address">Address</Label>
-                <Input
-                  id="address"
-                  value={contact.address}
-                  onChange={(e) => setContact({...contact, address: e.target.value})}
-                />
-              </div>
-              <Button onClick={updateContact} disabled={isLoading}>
-                {isLoading ? 'Updating...' : 'Update Contact'}
-              </Button>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Cancellation Policy Form */}
-        {cancellationPolicy && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Cancellation Policy</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <Label htmlFor="policy">Policy</Label>
-                <Input
-                  id="policy"
-                  value={cancellationPolicy.policy}
-                  onChange={(e) => setCancellationPolicy({...cancellationPolicy, policy: e.target.value})}
-                />
-              </div>
-              <div>
-                <Label htmlFor="refundPercentage">Refund Percentage</Label>
-                <Input
-                  id="refundPercentage"
-                  type="number"
-                  value={cancellationPolicy.refundPercentage}
-                  onChange={(e) => setCancellationPolicy({...cancellationPolicy, refundPercentage: Number(e.target.value)})}
-                />
-              </div>
-              <div>
-                <Label htmlFor="cancellationWindow">Cancellation Window (hours)</Label>
-                <Input
-                  id="cancellationWindow"
-                  type="number"
-                  value={cancellationPolicy.cancellationWindow}
-                  onChange={(e) => setCancellationPolicy({...cancellationPolicy, cancellationWindow: Number(e.target.value)})}
-                />
-              </div>
-              <Button onClick={updateCancellationPolicy} disabled={isLoading}>
-                {isLoading ? 'Updating...' : 'Update Cancellation Policy'}
-              </Button>
-            </CardContent>
-          </Card>
-        )}
       </div>
     </div>
   );
