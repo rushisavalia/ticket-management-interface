@@ -11,11 +11,11 @@ import { useToast } from '@/hooks/use-toast';
 
 interface Ticket {
   id: string;
-  name: string;
+  productName: string;
   vendorId: string;
   tourId: string;
   listingType: 'new_listing' | 'multi_variant';
-  status: string;
+  status?: string;
 }
 
 interface Vendor {
@@ -26,7 +26,8 @@ interface Vendor {
 interface Tour {
   id: string;
   name: string;
-  vendorId: string;
+  location?: string;
+  vendorId?: string;
 }
 
 interface Contact {
@@ -68,6 +69,7 @@ const TicketDashboard = () => {
 
   const fetchInitialData = async () => {
     setIsLoading(true);
+    console.log('Starting to fetch initial data...');
     try {
       const [ticketsRes, vendorsRes, toursRes] = await Promise.all([
         fetch(`${API_BASE}/tickets`),
@@ -85,13 +87,17 @@ const TicketDashboard = () => {
         toursRes.json()
       ]);
 
+      console.log('Fetched tickets:', ticketsData);
+      console.log('Fetched vendors:', vendorsData);
+      console.log('Fetched tours:', toursData);
+
       setTickets(ticketsData);
       setVendors(vendorsData);
       setTours(toursData);
       setError(null);
     } catch (err) {
-      setError('Failed to load initial data');
       console.error('Error fetching initial data:', err);
+      setError('Failed to load initial data');
     } finally {
       setIsLoading(false);
     }
@@ -101,6 +107,7 @@ const TicketDashboard = () => {
     if (!selectedTicket) return;
 
     setIsLoading(true);
+    console.log('Fetching contact and policy for ticket:', selectedTicket.id);
     try {
       const [contactRes, policyRes] = await Promise.all([
         fetch(`${API_BASE}/contact`),
@@ -115,6 +122,9 @@ const TicketDashboard = () => {
         contactRes.json(),
         policyRes.json()
       ]);
+
+      console.log('Contact data:', contactData);
+      console.log('Policy data:', policyData);
 
       // Find matching contact and policy by vendorId and tourId
       const matchingContact = contactData.find((c: Contact) => 
@@ -142,8 +152,8 @@ const TicketDashboard = () => {
       });
       setError(null);
     } catch (err) {
-      setError('Failed to fetch contact and cancellation policy');
       console.error('Error fetching contact and policy:', err);
+      setError('Failed to fetch contact and cancellation policy');
     } finally {
       setIsLoading(false);
     }
@@ -153,6 +163,7 @@ const TicketDashboard = () => {
     if (!selectedTicket) return;
 
     setIsLoading(true);
+    console.log('Adding to vendor tour:', selectedTicket.vendorId, selectedTicket.tourId);
     try {
       const response = await fetch(`${API_BASE}/vendorTours`, {
         method: 'POST',
@@ -177,8 +188,8 @@ const TicketDashboard = () => {
         description: "Added to vendor tours successfully",
       });
     } catch (err) {
-      setError('Failed to add to vendor tours');
       console.error('Error adding to vendor tours:', err);
+      setError('Failed to add to vendor tours');
     } finally {
       setIsLoading(false);
     }
@@ -188,6 +199,7 @@ const TicketDashboard = () => {
     if (!contact || !selectedTicket) return;
 
     setIsLoading(true);
+    console.log('Updating contact:', contact);
     try {
       const response = await fetch(`${API_BASE}/contact/${contact.id || 'new'}`, {
         method: contact.id ? 'PATCH' : 'POST',
@@ -207,8 +219,8 @@ const TicketDashboard = () => {
         description: "Contact updated successfully",
       });
     } catch (err) {
-      setError('Failed to update contact');
       console.error('Error updating contact:', err);
+      setError('Failed to update contact');
     } finally {
       setIsLoading(false);
     }
@@ -218,6 +230,7 @@ const TicketDashboard = () => {
     if (!cancellationPolicy || !selectedTicket) return;
 
     setIsLoading(true);
+    console.log('Updating cancellation policy:', cancellationPolicy);
     try {
       const response = await fetch(`${API_BASE}/cancellationPolicy/${cancellationPolicy.id || 'new'}`, {
         method: cancellationPolicy.id ? 'PATCH' : 'POST',
@@ -237,15 +250,16 @@ const TicketDashboard = () => {
         description: "Cancellation policy updated successfully",
       });
     } catch (err) {
-      setError('Failed to update cancellation policy');
       console.error('Error updating cancellation policy:', err);
+      setError('Failed to update cancellation policy');
     } finally {
       setIsLoading(false);
     }
   };
 
+  // Fixed the filter function to use productName instead of name and added null checks
   const filteredTickets = tickets.filter(ticket =>
-    ticket.name.toLowerCase().includes(searchTerm.toLowerCase())
+    ticket.productName && ticket.productName.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const selectedVendor = vendors.find(v => v.id === selectedTicket?.vendorId);
@@ -297,6 +311,7 @@ const TicketDashboard = () => {
               <div className="flex-1">
                 <Select onValueChange={(value) => {
                   const ticket = tickets.find(t => t.id === value);
+                  console.log('Selected ticket:', ticket);
                   setSelectedTicket(ticket || null);
                   setContact(null);
                   setCancellationPolicy(null);
@@ -308,7 +323,7 @@ const TicketDashboard = () => {
                   <SelectContent>
                     {filteredTickets.map((ticket) => (
                       <SelectItem key={ticket.id} value={ticket.id}>
-                        {ticket.name} - {ticket.listingType}
+                        {ticket.productName} - {ticket.listingType}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -334,11 +349,11 @@ const TicketDashboard = () => {
               <CardTitle>Ticket Information</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
-              <div><strong>Name:</strong> {selectedTicket.name}</div>
+              <div><strong>Name:</strong> {selectedTicket.productName}</div>
               <div><strong>Vendor:</strong> {selectedVendor?.name || 'Unknown'}</div>
               <div><strong>Tour:</strong> {selectedTour?.name || 'Unknown'}</div>
               <div><strong>Listing Type:</strong> {selectedTicket.listingType}</div>
-              <div><strong>Status:</strong> {selectedTicket.status}</div>
+              <div><strong>Status:</strong> {selectedTicket.status || 'N/A'}</div>
             </CardContent>
           </Card>
         )}
