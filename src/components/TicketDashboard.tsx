@@ -100,7 +100,13 @@ const TicketDashboard = () => {
       console.log('Fetched vendors:', vendorsRes.data);
       console.log('Fetched tours:', toursRes.data);
 
-      setTickets(ticketsRes.data || []);
+      // Type the tickets data properly
+      const typedTickets: Ticket[] = (ticketsRes.data || []).map(ticket => ({
+        ...ticket,
+        listing_type: ticket.listing_type as 'new_listing' | 'multi_variant'
+      }));
+
+      setTickets(typedTickets);
       setVendors(vendorsRes.data || []);
       setTours(toursRes.data || []);
       setError(null);
