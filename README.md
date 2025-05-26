@@ -3,12 +3,6 @@
 
 A full-stack web application for Headout’s internal QA team to manage and update ticket data, based on listing types (`new_listing` or `multi_variant`). This interface allows teams to fetch, edit, and submit data for tours, vendors, contacts, and cancellation policies with retry-safe error handling.
 
----
-
-## 🌐 Live Preview
-
-> **Deployed with Lovable**  
-🔗 [Project URL](https://lovable.dev/projects/83090ab3-c652-4022-a264-339d26f32912)
 
 ---
 
