@@ -9,7 +9,156 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      cancellation_policy: {
+        Row: {
+          cancellation_before_minutes: number | null
+          created_at: string | null
+          id: string
+          tour_id: string
+          updated_at: string | null
+          vendor_id: string
+        }
+        Insert: {
+          cancellation_before_minutes?: number | null
+          created_at?: string | null
+          id?: string
+          tour_id: string
+          updated_at?: string | null
+          vendor_id: string
+        }
+        Update: {
+          cancellation_before_minutes?: number | null
+          created_at?: string | null
+          id?: string
+          tour_id?: string
+          updated_at?: string | null
+          vendor_id?: string
+        }
+        Relationships: []
+      }
+      contact: {
+        Row: {
+          created_at: string | null
+          email: string | null
+          id: string
+          phone: string | null
+          tour_id: string
+          updated_at: string | null
+          vendor_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          email?: string | null
+          id?: string
+          phone?: string | null
+          tour_id: string
+          updated_at?: string | null
+          vendor_id: string
+        }
+        Update: {
+          created_at?: string | null
+          email?: string | null
+          id?: string
+          phone?: string | null
+          tour_id?: string
+          updated_at?: string | null
+          vendor_id?: string
+        }
+        Relationships: []
+      }
+      tickets: {
+        Row: {
+          created_at: string | null
+          id: string
+          listing_type: string
+          product_name: string
+          status: string | null
+          tour_id: string
+          vendor_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id: string
+          listing_type: string
+          product_name: string
+          status?: string | null
+          tour_id: string
+          vendor_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          listing_type?: string
+          product_name?: string
+          status?: string | null
+          tour_id?: string
+          vendor_id?: string
+        }
+        Relationships: []
+      }
+      tours: {
+        Row: {
+          created_at: string | null
+          id: string
+          location: string | null
+          name: string
+          vendor_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id: string
+          location?: string | null
+          name: string
+          vendor_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          location?: string | null
+          name?: string
+          vendor_id?: string | null
+        }
+        Relationships: []
+      }
+      vendor_tours: {
+        Row: {
+          added_at: string | null
+          id: string
+          tour_id: string
+          vendor_id: string
+        }
+        Insert: {
+          added_at?: string | null
+          id?: string
+          tour_id: string
+          vendor_id: string
+        }
+        Update: {
+          added_at?: string | null
+          id?: string
+          tour_id?: string
+          vendor_id?: string
+        }
+        Relationships: []
+      }
+      vendors: {
+        Row: {
+          created_at: string | null
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string | null
+          id: string
+          name: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
