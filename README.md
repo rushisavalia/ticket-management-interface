@@ -1,73 +1,117 @@
-# Welcome to your Lovable project
 
-## Project info
+# 🎟️ Ticket Management Interface (Headout)
 
-**URL**: https://lovable.dev/projects/83090ab3-c652-4022-a264-339d26f32912
+A full-stack web application for Headout’s internal QA team to manage and update ticket data, based on listing types (`new_listing` or `multi_variant`). This interface allows teams to fetch, edit, and submit data for tours, vendors, contacts, and cancellation policies with retry-safe error handling.
 
-## How can I edit this code?
+---
 
-There are several ways of editing your application.
+## 🌐 Live Preview
 
-**Use Lovable**
+> **Deployed with Lovable**  
+🔗 [Project URL](https://lovable.dev/projects/83090ab3-c652-4022-a264-339d26f32912)
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/83090ab3-c652-4022-a264-339d26f32912) and start prompting.
+---
 
-Changes made via Lovable will be committed automatically to this repo.
+## 🛠️ Tech Stack
 
-**Use your preferred IDE**
+| Layer      | Tech Used                                        |
+|------------|--------------------------------------------------|
+| Frontend   | React + TypeScript + Tailwind CSS (via Vite & shadcn-ui) |
+| Backend    | Node.js + Express (API Calls & Data Handling)    |
+| Database   | Supabase (used for demo; MongoDB initially planned) |
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+---
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+## 📁 Folder Structure
 
-Follow these steps:
+```
+├── src
+│   ├── components/
+│   ├── pages/
+│   ├── utils/
+│   ├── styles/
+│   └── App.tsx
+├── public/
+├── index.html
+├── vite.config.ts
+└── package.json
+```
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+---
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+## 🚀 Getting Started
 
-# Step 3: Install the necessary dependencies.
-npm i
+### 1. Clone the Repository
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+```bash
+git clone <REPO_URL>
+cd ticket-management-interface
+```
+
+### 2. Install Dependencies
+
+```bash
+npm install
+```
+
+### 3. Run the Project
+
+```bash
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+Visit `http://localhost:5173` to view the app locally.
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+---
 
-**Use GitHub Codespaces**
+## 📸 UI Overview (Screenshots)
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+> Create a `/screenshots` folder in the root of your GitHub repo and upload all screenshots inside it. Then use the GitHub UI or git commands to push the images.  
+> These filenames must match exactly.
 
-## What technologies are used for this project?
+### 1. 🎯 Dashboard with Ticket Dropdown  
+![Dropdown](./screenshots/Screenshot%202025-05-26%20at%2011.08.34%20AM.png)
 
-This project is built with:
+### 2. 🧾 Ticket Info Fetched  
+![Ticket Info](./screenshots/Screenshot%202025-05-26%20at%2011.08.47%20AM.png)
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+### 3. ⚙️ Action Buttons + Editable Fields  
+![Actions & Form](./screenshots/Screenshot%202025-05-26%20at%2011.09.06%20AM.png)
 
-## How can I deploy this project?
+### 4. ✏️ Editable Contact Info  
+![Edit Contact](./screenshots/Screenshot%202025-05-26%20at%2011.09.16%20AM.png)
 
-Simply open [Lovable](https://lovable.dev/projects/83090ab3-c652-4022-a264-339d26f32912) and click on Share -> Publish.
+### 5. 📤 Updated Data Reflected  
+![Updated Output](./screenshots/Screenshot%202025-05-26%20at%2011.09.43%20AM.png)
 
-## Can I connect a custom domain to my Lovable project?
+### 6. 🧪 Debug Console View  
+![Console Debug](./screenshots/Screenshot%202025-05-26%20at%2011.09.53%20AM.png)
 
-Yes, you can!
+### 7. 🗃 Supabase Table View  
+![Database View](./screenshots/Screenshot%202025-05-26%20at%2011.10.09%20AM.png)
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+---
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+## 💡 Features
+
+- Ticket selection dropdown with search
+- Fetches ticket, tour, vendor data via API
+- Conditional workflow based on listingType
+- Editable fields for contact and cancellation policy
+- Retry-safe updates with top-level error section
+- Data synced to Supabase (MongoDB support planned)
+
+---
+
+## 📌 Future Enhancements
+
+- Switch to MongoDB as primary database
+- Add authentication for QA team access
+- Real-time dashboard analytics (audit progress, failures)
+- Mobile responsiveness and dark mode
+
+---
+
+## 📬 Feedback
+
+For feedback or collaboration requests, feel free to reach out!
