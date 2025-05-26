@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -80,6 +79,8 @@ const TicketDashboard = () => {
   const [showCancellationForm, setShowCancellationForm] = useState(false);
   const { toast } = useToast();
 
+  const API_BASE_URL = 'https://my-json-server.typicode.com/neelbakshi94/test-plc';
+
   const updateLoadingState = (key: keyof typeof loadingStates, value: boolean) => {
     setLoadingStates(prev => ({ ...prev, [key]: value }));
   };
@@ -120,15 +121,23 @@ const TicketDashboard = () => {
   // API fetch functions
   const fetchTicketsFromApi = async () => {
     try {
-      // Replace with your actual API endpoint
-      const response = await fetch('/api/tickets');
+      const response = await fetch(`${API_BASE_URL}/tickets`);
       if (!response.ok) throw new Error('Failed to fetch tickets from API');
       
       const apiTickets = await response.json();
       console.log('Fetched tickets from API:', apiTickets);
       
+      // Transform API data to match our database structure
+      const transformedTickets = apiTickets.map((ticket: any) => ({
+        id: ticket.id.toString(),
+        product_name: ticket.productName,
+        vendor_id: ticket.vendorId.toString(),
+        tour_id: ticket.tourId.toString(),
+        listing_type: ticket.listingType as 'new_listing' | 'multi_variant'
+      }));
+      
       // Store in database
-      for (const ticket of apiTickets) {
+      for (const ticket of transformedTickets) {
         await supabase
           .from('tickets')
           .upsert({
@@ -136,18 +145,11 @@ const TicketDashboard = () => {
             product_name: ticket.product_name,
             vendor_id: ticket.vendor_id,
             tour_id: ticket.tour_id,
-            listing_type: ticket.listing_type,
-            status: ticket.status
+            listing_type: ticket.listing_type
           });
       }
       
-      // Type the tickets data properly
-      const typedTickets: Ticket[] = apiTickets.map((ticket: any) => ({
-        ...ticket,
-        listing_type: ticket.listing_type as 'new_listing' | 'multi_variant'
-      }));
-      
-      setTickets(typedTickets);
+      setTickets(transformedTickets);
     } catch (error) {
       console.error('Error fetching tickets:', error);
       addApiError('tickets', 'Failed to fetch tickets from API');
@@ -166,15 +168,20 @@ const TicketDashboard = () => {
 
   const fetchVendorsFromApi = async () => {
     try {
-      // Replace with your actual API endpoint
-      const response = await fetch('/api/vendors');
+      const response = await fetch(`${API_BASE_URL}/vendors`);
       if (!response.ok) throw new Error('Failed to fetch vendors from API');
       
       const apiVendors = await response.json();
       console.log('Fetched vendors from API:', apiVendors);
       
+      // Transform API data to match our database structure
+      const transformedVendors = apiVendors.map((vendor: any) => ({
+        id: vendor.id.toString(),
+        name: vendor.name
+      }));
+      
       // Store in database
-      for (const vendor of apiVendors) {
+      for (const vendor of transformedVendors) {
         await supabase
           .from('vendors')
           .upsert({
@@ -183,7 +190,7 @@ const TicketDashboard = () => {
           });
       }
       
-      setVendors(apiVendors);
+      setVendors(transformedVendors);
     } catch (error) {
       console.error('Error fetching vendors:', error);
       addApiError('vendors', 'Failed to fetch vendors from API');
@@ -196,26 +203,31 @@ const TicketDashboard = () => {
 
   const fetchToursFromApi = async () => {
     try {
-      // Replace with your actual API endpoint
-      const response = await fetch('/api/tours');
+      const response = await fetch(`${API_BASE_URL}/tours`);
       if (!response.ok) throw new Error('Failed to fetch tours from API');
       
       const apiTours = await response.json();
       console.log('Fetched tours from API:', apiTours);
       
+      // Transform API data to match our database structure
+      const transformedTours = apiTours.map((tour: any) => ({
+        id: tour.id.toString(),
+        name: tour.name,
+        location: tour.location
+      }));
+      
       // Store in database
-      for (const tour of apiTours) {
+      for (const tour of transformedTours) {
         await supabase
           .from('tours')
           .upsert({
             id: tour.id,
             name: tour.name,
-            location: tour.location,
-            vendor_id: tour.vendor_id
+            location: tour.location
           });
       }
       
-      setTours(apiTours);
+      setTours(transformedTours);
     } catch (error) {
       console.error('Error fetching tours:', error);
       addApiError('tours', 'Failed to fetch tours from API');
@@ -293,6 +305,53 @@ const TicketDashboard = () => {
     console.log('Fetching contact info for ticket:', selectedTicket.id);
     console.log('Looking for vendorId:', selectedTicket.vendor_id, 'tourId:', selectedTicket.tour_id);
     try {
+      // First try to fetch from API
+      const response = await fetch(`${API_BASE_URL}/contact`);
+      if (response.ok) {
+        const apiContacts = await response.json();
+        console.log('Contact data from API:', apiContacts);
+        
+        // Find matching contact
+        const matchingContact = apiContacts.find((contact: any) => 
+          contact.vendorId.toString() === selectedTicket.vendor_id && 
+          contact.tourId.toString() === selectedTicket.tour_id
+        );
+        
+        if (matchingContact) {
+          const transformedContact = {
+            id: matchingContact.id.toString(),
+            vendor_id: matchingContact.vendorId.toString(),
+            tour_id: matchingContact.tourId.toString(),
+            email: matchingContact.email,
+            phone: matchingContact.phone
+          };
+          
+          // Store in database
+          await supabase
+            .from('contact')
+            .upsert(transformedContact);
+          
+          setContact(transformedContact);
+        } else {
+          // Create empty contact for this vendor/tour combination
+          const emptyContact = {
+            id: '',
+            vendor_id: selectedTicket.vendor_id,
+            tour_id: selectedTicket.tour_id,
+            email: '',
+            phone: ''
+          };
+          setContact(emptyContact);
+        }
+      } else {
+        throw new Error('Failed to fetch from API');
+      }
+      
+      setShowContactInfo(true);
+      setShowContactForm(false);
+    } catch (err) {
+      console.error('Error fetching contact:', err);
+      // Fallback to database
       const { data: contactData, error } = await supabase
         .from('contact')
         .select('*')
@@ -300,14 +359,9 @@ const TicketDashboard = () => {
         .eq('tour_id', selectedTicket.tour_id)
         .maybeSingle();
 
-      if (error) throw error;
-
-      console.log('Contact data from Supabase:', contactData);
-
       if (contactData) {
         setContact(contactData);
       } else {
-        // Create empty contact for this vendor/tour combination
         const emptyContact = {
           id: '',
           vendor_id: selectedTicket.vendor_id,
@@ -316,18 +370,10 @@ const TicketDashboard = () => {
           phone: ''
         };
         setContact(emptyContact);
-        console.log('No matching contact found, created empty contact:', emptyContact);
       }
       
       setShowContactInfo(true);
       setShowContactForm(false);
-    } catch (err) {
-      console.error('Error fetching contact:', err);
-      toast({
-        title: "Error",
-        description: "Failed to fetch contact information",
-        variant: "destructive"
-      });
     } finally {
       updateLoadingState('fetchContact', false);
     }
@@ -340,6 +386,51 @@ const TicketDashboard = () => {
     console.log('Fetching cancellation policy for ticket:', selectedTicket.id);
     console.log('Looking for vendorId:', selectedTicket.vendor_id, 'tourId:', selectedTicket.tour_id);
     try {
+      // First try to fetch from API
+      const response = await fetch(`${API_BASE_URL}/cancellationPolicy`);
+      if (response.ok) {
+        const apiPolicies = await response.json();
+        console.log('Policy data from API:', apiPolicies);
+        
+        // Find matching policy
+        const matchingPolicy = apiPolicies.find((policy: any) => 
+          policy.vendorId.toString() === selectedTicket.vendor_id && 
+          policy.tourId.toString() === selectedTicket.tour_id
+        );
+        
+        if (matchingPolicy) {
+          const transformedPolicy = {
+            id: matchingPolicy.id.toString(),
+            vendor_id: matchingPolicy.vendorId.toString(),
+            tour_id: matchingPolicy.tourId.toString(),
+            cancellation_before_minutes: matchingPolicy.cancellationBeforeMinutes || 0
+          };
+          
+          // Store in database
+          await supabase
+            .from('cancellation_policy')
+            .upsert(transformedPolicy);
+          
+          setCancellationPolicy(transformedPolicy);
+        } else {
+          // Create empty policy for this vendor/tour combination
+          const emptyPolicy = {
+            id: '',
+            vendor_id: selectedTicket.vendor_id,
+            tour_id: selectedTicket.tour_id,
+            cancellation_before_minutes: 0
+          };
+          setCancellationPolicy(emptyPolicy);
+        }
+      } else {
+        throw new Error('Failed to fetch from API');
+      }
+      
+      setShowCancellationInfo(true);
+      setShowCancellationForm(false);
+    } catch (err) {
+      console.error('Error fetching cancellation policy:', err);
+      // Fallback to database
       const { data: policyData, error } = await supabase
         .from('cancellation_policy')
         .select('*')
@@ -347,14 +438,9 @@ const TicketDashboard = () => {
         .eq('tour_id', selectedTicket.tour_id)
         .maybeSingle();
 
-      if (error) throw error;
-
-      console.log('Policy data from Supabase:', policyData);
-
       if (policyData) {
         setCancellationPolicy(policyData);
       } else {
-        // Create empty policy for this vendor/tour combination
         const emptyPolicy = {
           id: '',
           vendor_id: selectedTicket.vendor_id,
@@ -362,18 +448,10 @@ const TicketDashboard = () => {
           cancellation_before_minutes: 0
         };
         setCancellationPolicy(emptyPolicy);
-        console.log('No matching policy found, created empty policy:', emptyPolicy);
       }
       
       setShowCancellationInfo(true);
       setShowCancellationForm(false);
-    } catch (err) {
-      console.error('Error fetching cancellation policy:', err);
-      toast({
-        title: "Error",
-        description: "Failed to fetch cancellation policy",
-        variant: "destructive"
-      });
     } finally {
       updateLoadingState('fetchCancellation', false);
     }
@@ -592,7 +670,6 @@ const TicketDashboard = () => {
               </Select>
             </div>
 
-            {/* Ticket Info - Enhanced UI */}
             {selectedTicket && (
               <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-8 border border-blue-100 shadow-sm">
                 <h3 className="text-xl font-bold text-gray-900 mb-6 flex items-center">
