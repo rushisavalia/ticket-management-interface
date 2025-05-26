@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, RefreshCw } from 'lucide-react';
+import { AlertCircle, RefreshCw, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -46,6 +46,12 @@ interface CancellationPolicy {
   cancellation_before_minutes: number;
 }
 
+interface ApiError {
+  type: 'tickets' | 'vendors' | 'tours';
+  message: string;
+  timestamp: number;
+}
+
 const TicketDashboard = () => {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [vendors, setVendors] = useState<Vendor[]>([]);
@@ -66,7 +72,7 @@ const TicketDashboard = () => {
     updateContact: false,
     updateCancellation: false
   });
-  const [error, setError] = useState<string | null>(null);
+  const [apiErrors, setApiErrors] = useState<ApiError[]>([]);
   const [isAddedToVendorTour, setIsAddedToVendorTour] = useState(false);
   const [showContactInfo, setShowContactInfo] = useState(false);
   const [showCancellationInfo, setShowCancellationInfo] = useState(false);
@@ -78,41 +84,164 @@ const TicketDashboard = () => {
     setLoadingStates(prev => ({ ...prev, [key]: value }));
   };
 
+  const addApiError = (type: ApiError['type'], message: string) => {
+    const newError: ApiError = {
+      type,
+      message,
+      timestamp: Date.now()
+    };
+    setApiErrors(prev => [...prev, newError]);
+  };
+
+  const removeApiError = (timestamp: number) => {
+    setApiErrors(prev => prev.filter(error => error.timestamp !== timestamp));
+  };
+
+  const retryApiCall = async (type: ApiError['type'], timestamp: number) => {
+    removeApiError(timestamp);
+    
+    try {
+      switch (type) {
+        case 'tickets':
+          await fetchTicketsFromApi();
+          break;
+        case 'vendors':
+          await fetchVendorsFromApi();
+          break;
+        case 'tours':
+          await fetchToursFromApi();
+          break;
+      }
+    } catch (error) {
+      console.error(`Retry failed for ${type}:`, error);
+    }
+  };
+
+  // API fetch functions
+  const fetchTicketsFromApi = async () => {
+    try {
+      // Replace with your actual API endpoint
+      const response = await fetch('/api/tickets');
+      if (!response.ok) throw new Error('Failed to fetch tickets from API');
+      
+      const apiTickets = await response.json();
+      console.log('Fetched tickets from API:', apiTickets);
+      
+      // Store in database
+      for (const ticket of apiTickets) {
+        await supabase
+          .from('tickets')
+          .upsert({
+            id: ticket.id,
+            product_name: ticket.product_name,
+            vendor_id: ticket.vendor_id,
+            tour_id: ticket.tour_id,
+            listing_type: ticket.listing_type,
+            status: ticket.status
+          });
+      }
+      
+      // Type the tickets data properly
+      const typedTickets: Ticket[] = apiTickets.map((ticket: any) => ({
+        ...ticket,
+        listing_type: ticket.listing_type as 'new_listing' | 'multi_variant'
+      }));
+      
+      setTickets(typedTickets);
+    } catch (error) {
+      console.error('Error fetching tickets:', error);
+      addApiError('tickets', 'Failed to fetch tickets from API');
+      
+      // Fallback to database data
+      const { data: dbTickets } = await supabase.from('tickets').select('*');
+      if (dbTickets) {
+        const typedTickets: Ticket[] = dbTickets.map(ticket => ({
+          ...ticket,
+          listing_type: ticket.listing_type as 'new_listing' | 'multi_variant'
+        }));
+        setTickets(typedTickets);
+      }
+    }
+  };
+
+  const fetchVendorsFromApi = async () => {
+    try {
+      // Replace with your actual API endpoint
+      const response = await fetch('/api/vendors');
+      if (!response.ok) throw new Error('Failed to fetch vendors from API');
+      
+      const apiVendors = await response.json();
+      console.log('Fetched vendors from API:', apiVendors);
+      
+      // Store in database
+      for (const vendor of apiVendors) {
+        await supabase
+          .from('vendors')
+          .upsert({
+            id: vendor.id,
+            name: vendor.name
+          });
+      }
+      
+      setVendors(apiVendors);
+    } catch (error) {
+      console.error('Error fetching vendors:', error);
+      addApiError('vendors', 'Failed to fetch vendors from API');
+      
+      // Fallback to database data
+      const { data: dbVendors } = await supabase.from('vendors').select('*');
+      if (dbVendors) setVendors(dbVendors);
+    }
+  };
+
+  const fetchToursFromApi = async () => {
+    try {
+      // Replace with your actual API endpoint
+      const response = await fetch('/api/tours');
+      if (!response.ok) throw new Error('Failed to fetch tours from API');
+      
+      const apiTours = await response.json();
+      console.log('Fetched tours from API:', apiTours);
+      
+      // Store in database
+      for (const tour of apiTours) {
+        await supabase
+          .from('tours')
+          .upsert({
+            id: tour.id,
+            name: tour.name,
+            location: tour.location,
+            vendor_id: tour.vendor_id
+          });
+      }
+      
+      setTours(apiTours);
+    } catch (error) {
+      console.error('Error fetching tours:', error);
+      addApiError('tours', 'Failed to fetch tours from API');
+      
+      // Fallback to database data
+      const { data: dbTours } = await supabase.from('tours').select('*');
+      if (dbTours) setTours(dbTours);
+    }
+  };
+
   useEffect(() => {
     fetchInitialData();
   }, []);
 
   const fetchInitialData = async () => {
     setIsLoading(true);
-    console.log('Starting to fetch initial data from Supabase...');
+    console.log('Starting to fetch initial data from API...');
+    
     try {
-      const [ticketsRes, vendorsRes, toursRes] = await Promise.all([
-        supabase.from('tickets').select('*'),
-        supabase.from('vendors').select('*'),
-        supabase.from('tours').select('*')
+      await Promise.all([
+        fetchTicketsFromApi(),
+        fetchVendorsFromApi(),
+        fetchToursFromApi()
       ]);
-
-      if (ticketsRes.error) throw ticketsRes.error;
-      if (vendorsRes.error) throw vendorsRes.error;
-      if (toursRes.error) throw toursRes.error;
-
-      console.log('Fetched tickets:', ticketsRes.data);
-      console.log('Fetched vendors:', vendorsRes.data);
-      console.log('Fetched tours:', toursRes.data);
-
-      // Type the tickets data properly
-      const typedTickets: Ticket[] = (ticketsRes.data || []).map(ticket => ({
-        ...ticket,
-        listing_type: ticket.listing_type as 'new_listing' | 'multi_variant'
-      }));
-
-      setTickets(typedTickets);
-      setVendors(vendorsRes.data || []);
-      setTours(toursRes.data || []);
-      setError(null);
-    } catch (err) {
-      console.error('Error fetching initial data:', err);
-      setError('Failed to load initial data');
+    } catch (error) {
+      console.error('Error in fetchInitialData:', error);
     } finally {
       setIsLoading(false);
     }
@@ -141,14 +270,17 @@ const TicketDashboard = () => {
       }
 
       setIsAddedToVendorTour(true);
-      setError(null);
       toast({
         title: "Success",
         description: "Added to vendor tours successfully",
       });
     } catch (err) {
       console.error('Error adding to vendor tours:', err);
-      setError('Failed to add to vendor tours');
+      toast({
+        title: "Error",
+        description: "Failed to add to vendor tours",
+        variant: "destructive"
+      });
     } finally {
       updateLoadingState('addToVendorTour', false);
     }
@@ -189,10 +321,13 @@ const TicketDashboard = () => {
       
       setShowContactInfo(true);
       setShowContactForm(false);
-      setError(null);
     } catch (err) {
       console.error('Error fetching contact:', err);
-      setError('Failed to fetch contact information');
+      toast({
+        title: "Error",
+        description: "Failed to fetch contact information",
+        variant: "destructive"
+      });
     } finally {
       updateLoadingState('fetchContact', false);
     }
@@ -232,10 +367,13 @@ const TicketDashboard = () => {
       
       setShowCancellationInfo(true);
       setShowCancellationForm(false);
-      setError(null);
     } catch (err) {
       console.error('Error fetching cancellation policy:', err);
-      setError('Failed to fetch cancellation policy');
+      toast({
+        title: "Error",
+        description: "Failed to fetch cancellation policy",
+        variant: "destructive"
+      });
     } finally {
       updateLoadingState('fetchCancellation', false);
     }
@@ -291,7 +429,6 @@ const TicketDashboard = () => {
 
       // Update the main contact state with the edited values
       setContact({ ...editingContact });
-      setError(null);
       setShowContactForm(false);
       setEditingContact(null);
       toast({
@@ -300,7 +437,11 @@ const TicketDashboard = () => {
       });
     } catch (err) {
       console.error('Error updating contact:', err);
-      setError('Failed to update contact');
+      toast({
+        title: "Error",
+        description: "Failed to update contact",
+        variant: "destructive"
+      });
     } finally {
       updateLoadingState('updateContact', false);
     }
@@ -340,7 +481,6 @@ const TicketDashboard = () => {
 
       // Update the main policy state with the edited values
       setCancellationPolicy({ ...editingCancellationPolicy });
-      setError(null);
       setShowCancellationForm(false);
       setEditingCancellationPolicy(null);
       toast({
@@ -349,7 +489,11 @@ const TicketDashboard = () => {
       });
     } catch (err) {
       console.error('Error updating cancellation policy:', err);
-      setError('Failed to update cancellation policy');
+      toast({
+        title: "Error",
+        description: "Failed to update cancellation policy",
+        variant: "destructive"
+      });
     } finally {
       updateLoadingState('updateCancellation', false);
     }
@@ -368,47 +512,53 @@ const TicketDashboard = () => {
   const selectedVendor = vendors.find(v => v.id === selectedTicket?.vendor_id);
   const selectedTour = tours.find(t => t.id === selectedTicket?.tour_id);
 
-  const retryLastOperation = () => {
-    setError(null);
-    if (!selectedTicket) {
-      fetchInitialData();
-    }
-  };
-
   return (
-    <div className="min-h-screen bg-custom-bg font-jakarta">
+    <div className="min-h-screen bg-[#E4FFF6] font-['Plus_Jakarta_Sans']">
       {/* Header */}
-      <div className="bg-custom-white border-b border-gray-200 px-6 py-4">
+      <div className="bg-[#FFFFFE] border-b border-gray-200 px-6 py-4">
         <div className="max-w-6xl mx-auto flex justify-between items-center">
           <h1 className="text-xl font-bold text-gray-900">Headout</h1>
-          <div className="bg-custom-button px-4 py-2 rounded-md">
+          <div className="bg-[#F5F0E5] px-4 py-2 rounded-md">
             <span className="text-sm font-semibold text-gray-700">Dashboard</span>
           </div>
         </div>
       </div>
 
       <div className="max-w-6xl mx-auto p-6">
-        {/* Error Section */}
-        {error && (
-          <Alert variant="destructive" className="mb-6">
+        {/* API Error Alerts */}
+        {apiErrors.map((error) => (
+          <Alert key={error.timestamp} variant="destructive" className="mb-4 bg-red-50 border-red-200">
             <AlertCircle className="h-4 w-4" />
-            <AlertDescription className="flex items-center justify-between">
-              <span>{error}</span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={retryLastOperation}
-                className="ml-4 bg-custom-button border-gray-300"
-              >
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Retry
-              </Button>
+            <AlertDescription className="flex items-center justify-between w-full">
+              <div className="flex-1">
+                <span className="font-semibold capitalize">{error.type} API Error:</span> {error.message}
+              </div>
+              <div className="flex gap-2 ml-4">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => retryApiCall(error.type, error.timestamp)}
+                  className="bg-[#F5F0E5] border-gray-300 hover:bg-gray-100"
+                >
+                  <RefreshCw className="h-4 w-4 mr-1" />
+                  Retry
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => removeApiError(error.timestamp)}
+                  className="bg-[#F5F0E5] border-gray-300 hover:bg-gray-100"
+                >
+                  <X className="h-4 w-4" />
+                  Dismiss
+                </Button>
+              </div>
             </AlertDescription>
           </Alert>
-        )}
+        ))}
 
         {/* Main Content Card */}
-        <Card className="bg-custom-white shadow-lg">
+        <Card className="bg-[#FFFFFE] shadow-lg">
           <CardContent className="p-8 space-y-8">
             {/* Ticket Selection */}
             <div>
@@ -429,10 +579,10 @@ const TicketDashboard = () => {
                 setShowContactForm(false);
                 setShowCancellationForm(false);
               }}>
-                <SelectTrigger className="max-w-md bg-custom-white">
+                <SelectTrigger className="max-w-md bg-[#FFFFFE]">
                   <SelectValue placeholder="Select a ticket" />
                 </SelectTrigger>
-                <SelectContent className="bg-custom-white">
+                <SelectContent className="bg-[#FFFFFE]">
                   {tickets.map((ticket) => (
                     <SelectItem key={ticket.id} value={ticket.id}>
                       {ticket.product_name}
@@ -491,7 +641,7 @@ const TicketDashboard = () => {
                     <Button
                       onClick={addToVendorTour}
                       disabled={loadingStates.addToVendorTour}
-                      className="bg-custom-button hover:bg-gray-200 text-gray-900 font-semibold border border-gray-300"
+                      className="bg-[#F5F0E5] hover:bg-gray-200 text-gray-900 font-semibold border border-gray-300"
                     >
                       {loadingStates.addToVendorTour ? 'Adding...' : 'Add to Vendor Tours'}
                     </Button>
@@ -503,14 +653,14 @@ const TicketDashboard = () => {
                       <Button
                         onClick={fetchContactInfo}
                         disabled={loadingStates.fetchContact}
-                        className="bg-custom-button hover:bg-gray-200 text-gray-900 font-semibold border border-gray-300"
+                        className="bg-[#F5F0E5] hover:bg-gray-200 text-gray-900 font-semibold border border-gray-300"
                       >
                         {loadingStates.fetchContact ? 'Fetching...' : 'Fetch Contact Info'}
                       </Button>
                       <Button
                         onClick={fetchCancellationPolicy}
                         disabled={loadingStates.fetchCancellation}
-                        className="bg-custom-button hover:bg-gray-200 text-gray-900 font-semibold border border-gray-300"
+                        className="bg-[#F5F0E5] hover:bg-gray-200 text-gray-900 font-semibold border border-gray-300"
                       >
                         {loadingStates.fetchCancellation ? 'Fetching...' : 'Fetch Cancellation Policy'}
                       </Button>
@@ -528,7 +678,7 @@ const TicketDashboard = () => {
                   {!showContactForm && (
                     <Button
                       onClick={handleContactUpdate}
-                      className="bg-custom-button hover:bg-gray-200 text-gray-900 font-semibold border border-gray-300"
+                      className="bg-[#F5F0E5] hover:bg-gray-200 text-gray-900 font-semibold border border-gray-300"
                     >
                       Update
                     </Button>
@@ -550,7 +700,7 @@ const TicketDashboard = () => {
 
                 {/* Contact Edit Form */}
                 {showContactForm && editingContact && (
-                  <div className="bg-custom-bg rounded-lg p-6 border border-gray-200">
+                  <div className="bg-[#E4FFF6] rounded-lg p-6 border border-gray-200">
                     <h4 className="text-base font-bold text-gray-900 mb-4">Edit Contact Information</h4>
                     <div className="space-y-4">
                       <div>
@@ -559,7 +709,7 @@ const TicketDashboard = () => {
                           id="phone"
                           value={editingContact.phone}
                           onChange={(e) => setEditingContact({...editingContact, phone: e.target.value})}
-                          className="mt-1 max-w-md bg-custom-white"
+                          className="mt-1 max-w-md bg-[#FFFFFE]"
                         />
                       </div>
                       <div>
@@ -569,7 +719,7 @@ const TicketDashboard = () => {
                           type="email"
                           value={editingContact.email}
                           onChange={(e) => setEditingContact({...editingContact, email: e.target.value})}
-                          className="mt-1 max-w-md bg-custom-white"
+                          className="mt-1 max-w-md bg-[#FFFFFE]"
                         />
                       </div>
                     </div>
@@ -584,7 +734,7 @@ const TicketDashboard = () => {
                       </Button>
                       <Button 
                         onClick={cancelContactEdit}
-                        className="bg-custom-button hover:bg-gray-200 text-gray-900 font-semibold border border-gray-300"
+                        className="bg-[#F5F0E5] hover:bg-gray-200 text-gray-900 font-semibold border border-gray-300"
                       >
                         Cancel
                       </Button>
@@ -602,7 +752,7 @@ const TicketDashboard = () => {
                   {!showCancellationForm && (
                     <Button
                       onClick={handleCancellationUpdate}
-                      className="bg-custom-button hover:bg-gray-200 text-gray-900 font-semibold border border-gray-300"
+                      className="bg-[#F5F0E5] hover:bg-gray-200 text-gray-900 font-semibold border border-gray-300"
                     >
                       Update
                     </Button>
@@ -623,7 +773,7 @@ const TicketDashboard = () => {
 
                 {/* Cancellation Policy Edit Form */}
                 {showCancellationForm && editingCancellationPolicy && (
-                  <div className="bg-custom-bg rounded-lg p-6 border border-gray-200">
+                  <div className="bg-[#E4FFF6] rounded-lg p-6 border border-gray-200">
                     <h4 className="text-base font-bold text-gray-900 mb-4">Edit Cancellation Policy</h4>
                     <div>
                       <Label htmlFor="cancellationPolicy" className="text-sm font-semibold text-gray-700">Cancellation Before Minutes</Label>
@@ -635,7 +785,7 @@ const TicketDashboard = () => {
                           ...editingCancellationPolicy, 
                           cancellation_before_minutes: Number(e.target.value)
                         })}
-                        className="mt-1 max-w-md bg-custom-white"
+                        className="mt-1 max-w-md bg-[#FFFFFE]"
                         placeholder="Minutes before cancellation"
                       />
                     </div>
@@ -650,7 +800,7 @@ const TicketDashboard = () => {
                       </Button>
                       <Button 
                         onClick={cancelCancellationEdit}
-                        className="bg-custom-button hover:bg-gray-200 text-gray-900 font-semibold border border-gray-300"
+                        className="bg-[#F5F0E5] hover:bg-gray-200 text-gray-900 font-semibold border border-gray-300"
                       >
                         Cancel
                       </Button>
