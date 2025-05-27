@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -276,6 +277,30 @@ const TicketDashboard = () => {
       // Generate a unique ID for the vendor_tours entry
       const vendorTourId = `${selectedTicket.vendor_id}_${selectedTicket.tour_id}`;
       
+      // First check if entry already exists
+      const { data: existingEntry, error: checkError } = await supabase
+        .from('vendor_tours')
+        .select('id')
+        .eq('vendor_id', selectedTicket.vendor_id)
+        .eq('tour_id', selectedTicket.tour_id)
+        .maybeSingle();
+
+      if (checkError) {
+        console.error('Error checking existing vendor tour:', checkError);
+        throw checkError;
+      }
+
+      if (existingEntry) {
+        console.log('Entry already exists in vendor_tours');
+        setIsAddedToVendorTour(true);
+        toast({
+          title: "Entry Already Exists",
+          description: "This vendor-tour combination already exists in the database",
+          variant: "default"
+        });
+        return;
+      }
+
       const { error } = await supabase
         .from('vendor_tours')
         .insert({
@@ -285,13 +310,8 @@ const TicketDashboard = () => {
         });
 
       if (error) {
-        // If it's a unique constraint violation, treat as success
-        if (error.code === '23505') {
-          console.log('Entry already exists in vendor_tours');
-        } else {
-          console.error('Error adding to vendor tours:', error);
-          throw error;
-        }
+        console.error('Error adding to vendor tours:', error);
+        throw error;
       }
 
       setIsAddedToVendorTour(true);
@@ -327,19 +347,19 @@ const TicketDashboard = () => {
       const apiContacts = await response.json();
       console.log('Contact data from API:', apiContacts);
       
-      // Find matching contact
+      // Find matching contact - ensure both IDs are strings
       const matchingContact = apiContacts.find((contact: any) => 
-        contact.vendorId.toString() === selectedTicket.vendor_id && 
-        contact.tourId.toString() === selectedTicket.tour_id
+        String(contact.vendorId) === String(selectedTicket.vendor_id) && 
+        String(contact.tourId) === String(selectedTicket.tour_id)
       );
       
       console.log('Found matching contact:', matchingContact);
       
       if (matchingContact) {
         const transformedContact = {
-          id: matchingContact.id.toString(),
-          vendor_id: matchingContact.vendorId.toString(),
-          tour_id: matchingContact.tourId.toString(),
+          id: String(matchingContact.id),
+          vendor_id: String(matchingContact.vendorId),
+          tour_id: String(matchingContact.tourId),
           email: matchingContact.email || '',
           phone: matchingContact.phone || ''
         };
@@ -380,13 +400,15 @@ const TicketDashboard = () => {
       const { data: contactData, error } = await supabase
         .from('contact')
         .select('*')
-        .eq('vendor_id', selectedTicket.vendor_id)
-        .eq('tour_id', selectedTicket.tour_id)
+        .eq('vendor_id', String(selectedTicket.vendor_id))
+        .eq('tour_id', String(selectedTicket.tour_id))
         .maybeSingle();
 
       if (contactData) {
+        console.log('Found contact in database:', contactData);
         setContact(contactData);
       } else {
+        console.log('No contact found in database, creating empty contact');
         const emptyContact = {
           id: `contact_${selectedTicket.vendor_id}_${selectedTicket.tour_id}`,
           vendor_id: selectedTicket.vendor_id,
@@ -420,19 +442,19 @@ const TicketDashboard = () => {
       const apiPolicies = await response.json();
       console.log('Policy data from API:', apiPolicies);
       
-      // Find matching policy
+      // Find matching policy - ensure both IDs are strings
       const matchingPolicy = apiPolicies.find((policy: any) => 
-        policy.vendorId.toString() === selectedTicket.vendor_id && 
-        policy.tourId.toString() === selectedTicket.tour_id
+        String(policy.vendorId) === String(selectedTicket.vendor_id) && 
+        String(policy.tourId) === String(selectedTicket.tour_id)
       );
       
       console.log('Found matching policy:', matchingPolicy);
       
       if (matchingPolicy) {
         const transformedPolicy = {
-          id: matchingPolicy.id.toString(),
-          vendor_id: matchingPolicy.vendorId.toString(),
-          tour_id: matchingPolicy.tourId.toString(),
+          id: String(matchingPolicy.id),
+          vendor_id: String(matchingPolicy.vendorId),
+          tour_id: String(matchingPolicy.tourId),
           cancellation_before_minutes: matchingPolicy.cancellationBeforeMinutes || 0
         };
         
@@ -471,13 +493,15 @@ const TicketDashboard = () => {
       const { data: policyData, error } = await supabase
         .from('cancellation_policy')
         .select('*')
-        .eq('vendor_id', selectedTicket.vendor_id)
-        .eq('tour_id', selectedTicket.tour_id)
+        .eq('vendor_id', String(selectedTicket.vendor_id))
+        .eq('tour_id', String(selectedTicket.tour_id))
         .maybeSingle();
 
       if (policyData) {
+        console.log('Found policy in database:', policyData);
         setCancellationPolicy(policyData);
       } else {
+        console.log('No policy found in database, creating empty policy');
         const emptyPolicy = {
           id: `policy_${selectedTicket.vendor_id}_${selectedTicket.tour_id}`,
           vendor_id: selectedTicket.vendor_id,
