@@ -64,25 +64,25 @@ Visit `http://localhost:5173` to view the app locally.
 > These filenames must match exactly.
 
 ### 1. 🎯 Dashboard with Ticket Dropdown  
-![Dropdown](./screenshots/Screenshot%202025-05-26%20at%2011.08.34%20AM.png)
+![Dropdown](./screenshots/ticket-dashboard-empty.png)
 
 ### 2. 🧾 Ticket Info Fetched  
-![Ticket Info](./screenshots/Screenshot%202025-05-26%20at%2011.08.47%20AM.png)
+![Ticket Info](./screenshots/ticket-dashboard-new-listing.png)
 
 ### 3. ⚙️ Action Buttons + Editable Fields  
-![Actions & Form](./screenshots/Screenshot%202025-05-26%20at%2011.09.06%20AM.png)
+![Actions & Form](./screenshots/contact-info-display.png)
 
 ### 4. ✏️ Editable Contact Info  
-![Edit Contact](./screenshots/Screenshot%202025-05-26%20at%2011.09.16%20AM.png)
+![Edit Contact](./screenshots/contact-info-edit.png)
 
 ### 5. 📤 Updated Data Reflected  
-![Updated Output](./screenshots/Screenshot%202025-05-26%20at%2011.09.43%20AM.png)
+![Updated Output](./screenshots/contact-info-updated.png)
 
 ### 6. 🧪 Debug Console View  
-![Console Debug](./screenshots/Screenshot%202025-05-26%20at%2011.09.53%20AM.png)
+![Console Debug](./screenshots/console-logs-working.png)
 
 ### 7. 🗃 Supabase Table View  
-![Database View](./screenshots/Screenshot%202025-05-26%20at%2011.10.09%20AM.png)
+![Database View](./screenshots/supabase-contact-table.png)
 
 ---
 
