@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -125,7 +124,6 @@ const TicketDashboard = () => {
     }
   };
 
-  // API fetch functions
   const fetchTicketsFromApi = async () => {
     try {
       console.log('Fetching tickets from API...');
@@ -363,7 +361,7 @@ const TicketDashboard = () => {
         console.log('No matching contact found, creating empty contact');
         // Create empty contact for this vendor/tour combination
         const emptyContact = {
-          id: '',
+          id: `contact_${selectedTicket.vendor_id}_${selectedTicket.tour_id}`,
           vendor_id: selectedTicket.vendor_id,
           tour_id: selectedTicket.tour_id,
           email: '',
@@ -390,7 +388,7 @@ const TicketDashboard = () => {
         setContact(contactData);
       } else {
         const emptyContact = {
-          id: '',
+          id: `contact_${selectedTicket.vendor_id}_${selectedTicket.tour_id}`,
           vendor_id: selectedTicket.vendor_id,
           tour_id: selectedTicket.tour_id,
           email: '',
@@ -455,7 +453,7 @@ const TicketDashboard = () => {
         console.log('No matching policy found, creating empty policy');
         // Create empty policy for this vendor/tour combination
         const emptyPolicy = {
-          id: '',
+          id: `policy_${selectedTicket.vendor_id}_${selectedTicket.tour_id}`,
           vendor_id: selectedTicket.vendor_id,
           tour_id: selectedTicket.tour_id,
           cancellation_before_minutes: 0
@@ -481,7 +479,7 @@ const TicketDashboard = () => {
         setCancellationPolicy(policyData);
       } else {
         const emptyPolicy = {
-          id: '',
+          id: `policy_${selectedTicket.vendor_id}_${selectedTicket.tour_id}`,
           vendor_id: selectedTicket.vendor_id,
           tour_id: selectedTicket.tour_id,
           cancellation_before_minutes: 0
@@ -518,8 +516,8 @@ const TicketDashboard = () => {
     try {
       let result;
       
-      if (editingContact.id) {
-        // Update existing contact
+      if (editingContact.id && !editingContact.id.startsWith('contact_')) {
+        // Update existing contact from API
         result = await supabase
           .from('contact')
           .update({
@@ -529,10 +527,12 @@ const TicketDashboard = () => {
           })
           .eq('id', editingContact.id);
       } else {
-        // Insert new contact
+        // Insert new contact with generated ID
+        const newContactId = editingContact.id.startsWith('contact_') ? editingContact.id : `contact_${selectedTicket.vendor_id}_${selectedTicket.tour_id}_${Date.now()}`;
         result = await supabase
           .from('contact')
           .insert({
+            id: newContactId,
             vendor_id: editingContact.vendor_id,
             tour_id: editingContact.tour_id,
             email: editingContact.email,
@@ -572,8 +572,8 @@ const TicketDashboard = () => {
     try {
       let result;
       
-      if (editingCancellationPolicy.id) {
-        // Update existing policy
+      if (editingCancellationPolicy.id && !editingCancellationPolicy.id.startsWith('policy_')) {
+        // Update existing policy from API
         result = await supabase
           .from('cancellation_policy')
           .update({
@@ -582,10 +582,12 @@ const TicketDashboard = () => {
           })
           .eq('id', editingCancellationPolicy.id);
       } else {
-        // Insert new policy
+        // Insert new policy with generated ID
+        const newPolicyId = editingCancellationPolicy.id.startsWith('policy_') ? editingCancellationPolicy.id : `policy_${selectedTicket.vendor_id}_${selectedTicket.tour_id}_${Date.now()}`;
         result = await supabase
           .from('cancellation_policy')
           .insert({
+            id: newPolicyId,
             vendor_id: editingCancellationPolicy.vendor_id,
             tour_id: editingCancellationPolicy.tour_id,
             cancellation_before_minutes: editingCancellationPolicy.cancellation_before_minutes
