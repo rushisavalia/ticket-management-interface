@@ -21,7 +21,7 @@ export type Database = {
         Insert: {
           cancellation_before_minutes?: number | null
           created_at?: string | null
-          id?: string
+          id: string
           tour_id: string
           updated_at?: string | null
           vendor_id: string
@@ -49,7 +49,7 @@ export type Database = {
         Insert: {
           created_at?: string | null
           email?: string | null
-          id?: string
+          id: string
           phone?: string | null
           tour_id: string
           updated_at?: string | null
@@ -129,7 +129,7 @@ export type Database = {
         }
         Insert: {
           added_at?: string | null
-          id?: string
+          id: string
           tour_id: string
           vendor_id: string
         }

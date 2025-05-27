@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -274,9 +275,13 @@ const TicketDashboard = () => {
     updateLoadingState('addToVendorTour', true);
     console.log('Adding to vendor tour:', selectedTicket.vendor_id, selectedTicket.tour_id);
     try {
+      // Generate a unique ID for the vendor_tours entry
+      const vendorTourId = `${selectedTicket.vendor_id}_${selectedTicket.tour_id}`;
+      
       const { error } = await supabase
         .from('vendor_tours')
         .insert({
+          id: vendorTourId,
           vendor_id: selectedTicket.vendor_id,
           tour_id: selectedTicket.tour_id
         });
@@ -286,6 +291,7 @@ const TicketDashboard = () => {
         if (error.code === '23505') {
           console.log('Entry already exists in vendor_tours');
         } else {
+          console.error('Error adding to vendor tours:', error);
           throw error;
         }
       }
