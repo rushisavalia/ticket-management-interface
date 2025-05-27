@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -338,6 +337,9 @@ const TicketDashboard = () => {
     console.log('Fetching contact info for ticket:', selectedTicket.id);
     console.log('Looking for vendorId:', selectedTicket.vendor_id, 'tourId:', selectedTicket.tour_id);
     
+    let contactFound = false;
+    let finalContact: Contact | null = null;
+    
     try {
       // First try to fetch from API
       console.log('Fetching contact data from API...');
@@ -415,57 +417,54 @@ const TicketDashboard = () => {
         
         if (error) {
           console.error('Error storing contact in database:', error);
-          throw error;
+        } else {
+          finalContact = { ...transformedContact, id: contactId };
+          contactFound = true;
         }
-        
-        setContact({ ...transformedContact, id: contactId });
-      } else {
-        console.log('No matching contact found, creating empty contact');
-        // Create empty contact for this vendor/tour combination
-        const emptyContact = {
-          id: `contact_${selectedTicket.vendor_id}_${selectedTicket.tour_id}_${Date.now()}`,
-          vendor_id: selectedTicket.vendor_id,
-          tour_id: selectedTicket.tour_id,
-          email: '',
-          phone: ''
-        };
-        setContact(emptyContact);
       }
       
-      setShowContactInfo(true);
-      setShowContactForm(false);
     } catch (err) {
-      console.error('Error fetching contact:', err);
-      addApiError('contact', err instanceof Error ? err.message : 'Failed to fetch contact from API');
-      
-      // Fallback to database
-      const { data: contactData, error } = await supabase
-        .from('contact')
-        .select('*')
-        .eq('vendor_id', String(selectedTicket.vendor_id))
-        .eq('tour_id', String(selectedTicket.tour_id))
-        .maybeSingle();
-
-      if (contactData) {
-        console.log('Found contact in database:', contactData);
-        setContact(contactData);
-      } else {
-        console.log('No contact found in database, creating empty contact');
-        const emptyContact = {
-          id: `contact_${selectedTicket.vendor_id}_${selectedTicket.tour_id}_${Date.now()}`,
-          vendor_id: selectedTicket.vendor_id,
-          tour_id: selectedTicket.tour_id,
-          email: '',
-          phone: ''
-        };
-        setContact(emptyContact);
-      }
-      
-      setShowContactInfo(true);
-      setShowContactForm(false);
-    } finally {
-      updateLoadingState('fetchContact', false);
+      console.error('Error fetching contact from API:', err);
+      // Don't add error immediately, try database first
     }
+    
+    // If not found in API, try database
+    if (!contactFound) {
+      try {
+        const { data: contactData, error } = await supabase
+          .from('contact')
+          .select('*')
+          .eq('vendor_id', String(selectedTicket.vendor_id))
+          .eq('tour_id', String(selectedTicket.tour_id))
+          .maybeSingle();
+
+        if (contactData) {
+          console.log('Found contact in database:', contactData);
+          finalContact = contactData;
+          contactFound = true;
+        }
+      } catch (dbError) {
+        console.error('Error fetching from database:', dbError);
+      }
+    }
+    
+    // Only add API error if both API and database failed
+    if (!contactFound) {
+      addApiError('contact', 'Failed to fetch contact from API and database');
+      // Create empty contact as fallback
+      finalContact = {
+        id: `contact_${selectedTicket.vendor_id}_${selectedTicket.tour_id}_${Date.now()}`,
+        vendor_id: selectedTicket.vendor_id,
+        tour_id: selectedTicket.tour_id,
+        email: '',
+        phone: ''
+      };
+    }
+    
+    setContact(finalContact);
+    setShowContactInfo(true);
+    setShowContactForm(false);
+    updateLoadingState('fetchContact', false);
   };
 
   const fetchCancellationPolicy = async () => {
@@ -474,6 +473,9 @@ const TicketDashboard = () => {
     updateLoadingState('fetchCancellation', true);
     console.log('Fetching cancellation policy for ticket:', selectedTicket.id);
     console.log('Looking for vendorId:', selectedTicket.vendor_id, 'tourId:', selectedTicket.tour_id);
+    
+    let policyFound = false;
+    let finalPolicy: CancellationPolicy | null = null;
     
     try {
       // First try to fetch from API
@@ -550,55 +552,53 @@ const TicketDashboard = () => {
         
         if (error) {
           console.error('Error storing policy in database:', error);
-          throw error;
+        } else {
+          finalPolicy = { ...transformedPolicy, id: policyId };
+          policyFound = true;
         }
-        
-        setCancellationPolicy({ ...transformedPolicy, id: policyId });
-      } else {
-        console.log('No matching policy found, creating empty policy');
-        // Create empty policy for this vendor/tour combination
-        const emptyPolicy = {
-          id: `policy_${selectedTicket.vendor_id}_${selectedTicket.tour_id}_${Date.now()}`,
-          vendor_id: selectedTicket.vendor_id,
-          tour_id: selectedTicket.tour_id,
-          cancellation_before_minutes: 0
-        };
-        setCancellationPolicy(emptyPolicy);
       }
       
-      setShowCancellationInfo(true);
-      setShowCancellationForm(false);
     } catch (err) {
-      console.error('Error fetching cancellation policy:', err);
-      addApiError('cancellation', err instanceof Error ? err.message : 'Failed to fetch cancellation policy from API');
-      
-      // Fallback to database
-      const { data: policyData, error } = await supabase
-        .from('cancellation_policy')
-        .select('*')
-        .eq('vendor_id', String(selectedTicket.vendor_id))
-        .eq('tour_id', String(selectedTicket.tour_id))
-        .maybeSingle();
-
-      if (policyData) {
-        console.log('Found policy in database:', policyData);
-        setCancellationPolicy(policyData);
-      } else {
-        console.log('No policy found in database, creating empty policy');
-        const emptyPolicy = {
-          id: `policy_${selectedTicket.vendor_id}_${selectedTicket.tour_id}_${Date.now()}`,
-          vendor_id: selectedTicket.vendor_id,
-          tour_id: selectedTicket.tour_id,
-          cancellation_before_minutes: 0
-        };
-        setCancellationPolicy(emptyPolicy);
-      }
-      
-      setShowCancellationInfo(true);
-      setShowCancellationForm(false);
-    } finally {
-      updateLoadingState('fetchCancellation', false);
+      console.error('Error fetching cancellation policy from API:', err);
+      // Don't add error immediately, try database first
     }
+    
+    // If not found in API, try database
+    if (!policyFound) {
+      try {
+        const { data: policyData, error } = await supabase
+          .from('cancellation_policy')
+          .select('*')
+          .eq('vendor_id', String(selectedTicket.vendor_id))
+          .eq('tour_id', String(selectedTicket.tour_id))
+          .maybeSingle();
+
+        if (policyData) {
+          console.log('Found policy in database:', policyData);
+          finalPolicy = policyData;
+          policyFound = true;
+        }
+      } catch (dbError) {
+        console.error('Error fetching from database:', dbError);
+      }
+    }
+    
+    // Only add API error if both API and database failed
+    if (!policyFound) {
+      addApiError('cancellation', 'Failed to fetch cancellation policy from API and database');
+      // Create empty policy as fallback
+      finalPolicy = {
+        id: `policy_${selectedTicket.vendor_id}_${selectedTicket.tour_id}_${Date.now()}`,
+        vendor_id: selectedTicket.vendor_id,
+        tour_id: selectedTicket.tour_id,
+        cancellation_before_minutes: 0
+      };
+    }
+    
+    setCancellationPolicy(finalPolicy);
+    setShowCancellationInfo(true);
+    setShowCancellationForm(false);
+    updateLoadingState('fetchCancellation', false);
   };
 
   const handleContactUpdate = () => {
