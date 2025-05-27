@@ -347,13 +347,45 @@ const TicketDashboard = () => {
       const apiContacts = await response.json();
       console.log('Contact data from API:', apiContacts);
       
-      // Find matching contact - ensure both IDs are strings
-      const matchingContact = apiContacts.find((contact: any) => 
+      // Enhanced matching logic - try multiple comparison methods
+      let matchingContact = null;
+      
+      // Try exact string match first
+      matchingContact = apiContacts.find((contact: any) => 
         String(contact.vendorId) === String(selectedTicket.vendor_id) && 
         String(contact.tourId) === String(selectedTicket.tour_id)
       );
       
+      // If not found, try numeric comparison
+      if (!matchingContact) {
+        matchingContact = apiContacts.find((contact: any) => 
+          Number(contact.vendorId) === Number(selectedTicket.vendor_id) && 
+          Number(contact.tourId) === Number(selectedTicket.tour_id)
+        );
+      }
+      
+      // If still not found, try loose comparison
+      if (!matchingContact) {
+        matchingContact = apiContacts.find((contact: any) => 
+          contact.vendorId == selectedTicket.vendor_id && 
+          contact.tourId == selectedTicket.tour_id
+        );
+      }
+      
       console.log('Found matching contact:', matchingContact);
+      console.log('Available contacts in API:', apiContacts.map((c: any) => ({ 
+        id: c.id, 
+        vendorId: c.vendorId, 
+        tourId: c.tourId,
+        vendorIdType: typeof c.vendorId,
+        tourIdType: typeof c.tourId
+      })));
+      console.log('Looking for:', { 
+        vendorId: selectedTicket.vendor_id, 
+        tourId: selectedTicket.tour_id,
+        vendorIdType: typeof selectedTicket.vendor_id,
+        tourIdType: typeof selectedTicket.tour_id
+      });
       
       if (matchingContact) {
         const transformedContact = {
@@ -366,22 +398,32 @@ const TicketDashboard = () => {
         
         console.log('Transformed contact:', transformedContact);
         
-        // Store in database
+        // Store in database with generated ID if needed
+        const contactId = transformedContact.id.includes('contact_') ? 
+          transformedContact.id : 
+          `contact_${transformedContact.vendor_id}_${transformedContact.tour_id}_${Date.now()}`;
+        
         const { error } = await supabase
           .from('contact')
-          .upsert(transformedContact);
+          .upsert({
+            id: contactId,
+            vendor_id: transformedContact.vendor_id,
+            tour_id: transformedContact.tour_id,
+            email: transformedContact.email,
+            phone: transformedContact.phone
+          });
         
         if (error) {
           console.error('Error storing contact in database:', error);
           throw error;
         }
         
-        setContact(transformedContact);
+        setContact({ ...transformedContact, id: contactId });
       } else {
         console.log('No matching contact found, creating empty contact');
         // Create empty contact for this vendor/tour combination
         const emptyContact = {
-          id: `contact_${selectedTicket.vendor_id}_${selectedTicket.tour_id}`,
+          id: `contact_${selectedTicket.vendor_id}_${selectedTicket.tour_id}_${Date.now()}`,
           vendor_id: selectedTicket.vendor_id,
           tour_id: selectedTicket.tour_id,
           email: '',
@@ -410,7 +452,7 @@ const TicketDashboard = () => {
       } else {
         console.log('No contact found in database, creating empty contact');
         const emptyContact = {
-          id: `contact_${selectedTicket.vendor_id}_${selectedTicket.tour_id}`,
+          id: `contact_${selectedTicket.vendor_id}_${selectedTicket.tour_id}_${Date.now()}`,
           vendor_id: selectedTicket.vendor_id,
           tour_id: selectedTicket.tour_id,
           email: '',
@@ -442,13 +484,45 @@ const TicketDashboard = () => {
       const apiPolicies = await response.json();
       console.log('Policy data from API:', apiPolicies);
       
-      // Find matching policy - ensure both IDs are strings
-      const matchingPolicy = apiPolicies.find((policy: any) => 
+      // Enhanced matching logic - try multiple comparison methods
+      let matchingPolicy = null;
+      
+      // Try exact string match first
+      matchingPolicy = apiPolicies.find((policy: any) => 
         String(policy.vendorId) === String(selectedTicket.vendor_id) && 
         String(policy.tourId) === String(selectedTicket.tour_id)
       );
       
+      // If not found, try numeric comparison
+      if (!matchingPolicy) {
+        matchingPolicy = apiPolicies.find((policy: any) => 
+          Number(policy.vendorId) === Number(selectedTicket.vendor_id) && 
+          Number(policy.tourId) === Number(selectedTicket.tour_id)
+        );
+      }
+      
+      // If still not found, try loose comparison
+      if (!matchingPolicy) {
+        matchingPolicy = apiPolicies.find((policy: any) => 
+          policy.vendorId == selectedTicket.vendor_id && 
+          policy.tourId == selectedTicket.tour_id
+        );
+      }
+      
       console.log('Found matching policy:', matchingPolicy);
+      console.log('Available policies in API:', apiPolicies.map((p: any) => ({ 
+        id: p.id, 
+        vendorId: p.vendorId, 
+        tourId: p.tourId,
+        vendorIdType: typeof p.vendorId,
+        tourIdType: typeof p.tourId
+      })));
+      console.log('Looking for:', { 
+        vendorId: selectedTicket.vendor_id, 
+        tourId: selectedTicket.tour_id,
+        vendorIdType: typeof selectedTicket.vendor_id,
+        tourIdType: typeof selectedTicket.tour_id
+      });
       
       if (matchingPolicy) {
         const transformedPolicy = {
@@ -460,22 +534,31 @@ const TicketDashboard = () => {
         
         console.log('Transformed policy:', transformedPolicy);
         
-        // Store in database
+        // Store in database with generated ID if needed
+        const policyId = transformedPolicy.id.includes('policy_') ? 
+          transformedPolicy.id : 
+          `policy_${transformedPolicy.vendor_id}_${transformedPolicy.tour_id}_${Date.now()}`;
+        
         const { error } = await supabase
           .from('cancellation_policy')
-          .upsert(transformedPolicy);
+          .upsert({
+            id: policyId,
+            vendor_id: transformedPolicy.vendor_id,
+            tour_id: transformedPolicy.tour_id,
+            cancellation_before_minutes: transformedPolicy.cancellation_before_minutes
+          });
         
         if (error) {
           console.error('Error storing policy in database:', error);
           throw error;
         }
         
-        setCancellationPolicy(transformedPolicy);
+        setCancellationPolicy({ ...transformedPolicy, id: policyId });
       } else {
         console.log('No matching policy found, creating empty policy');
         // Create empty policy for this vendor/tour combination
         const emptyPolicy = {
-          id: `policy_${selectedTicket.vendor_id}_${selectedTicket.tour_id}`,
+          id: `policy_${selectedTicket.vendor_id}_${selectedTicket.tour_id}_${Date.now()}`,
           vendor_id: selectedTicket.vendor_id,
           tour_id: selectedTicket.tour_id,
           cancellation_before_minutes: 0
@@ -503,7 +586,7 @@ const TicketDashboard = () => {
       } else {
         console.log('No policy found in database, creating empty policy');
         const emptyPolicy = {
-          id: `policy_${selectedTicket.vendor_id}_${selectedTicket.tour_id}`,
+          id: `policy_${selectedTicket.vendor_id}_${selectedTicket.tour_id}_${Date.now()}`,
           vendor_id: selectedTicket.vendor_id,
           tour_id: selectedTicket.tour_id,
           cancellation_before_minutes: 0
