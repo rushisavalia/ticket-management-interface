@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, RefreshCw, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import ApiErrorAlerts from './ticket/ApiErrorAlerts';
+import TicketSelection from './ticket/TicketSelection';
+import TicketInformation from './ticket/TicketInformation';
+import ActionsSection from './ticket/ActionsSection';
+import ContactInfoSection from './ticket/ContactInfoSection';
+import CancellationPolicySection from './ticket/CancellationPolicySection';
 
 interface Ticket {
   id: string;
@@ -339,6 +339,7 @@ const TicketDashboard = () => {
     
     let contactFound = false;
     let finalContact: Contact | null = null;
+    let apiError = null;
     
     try {
       // First try to fetch from API
@@ -425,7 +426,7 @@ const TicketDashboard = () => {
       
     } catch (err) {
       console.error('Error fetching contact from API:', err);
-      // Don't add error immediately, try database first
+      apiError = err;
     }
     
     // If not found in API, try database
@@ -448,10 +449,19 @@ const TicketDashboard = () => {
       }
     }
     
-    // Only add API error if both API and database failed
-    if (!contactFound) {
+    // Only add API error if both API and database failed AND it's a real API error
+    if (!contactFound && apiError) {
       addApiError('contact', 'Failed to fetch contact from API and database');
       // Create empty contact as fallback
+      finalContact = {
+        id: `contact_${selectedTicket.vendor_id}_${selectedTicket.tour_id}_${Date.now()}`,
+        vendor_id: selectedTicket.vendor_id,
+        tour_id: selectedTicket.tour_id,
+        email: '',
+        phone: ''
+      };
+    } else if (!contactFound) {
+      // If no API error but still not found, create empty contact without showing error
       finalContact = {
         id: `contact_${selectedTicket.vendor_id}_${selectedTicket.tour_id}_${Date.now()}`,
         vendor_id: selectedTicket.vendor_id,
@@ -476,6 +486,7 @@ const TicketDashboard = () => {
     
     let policyFound = false;
     let finalPolicy: CancellationPolicy | null = null;
+    let apiError = null;
     
     try {
       // First try to fetch from API
@@ -560,7 +571,7 @@ const TicketDashboard = () => {
       
     } catch (err) {
       console.error('Error fetching cancellation policy from API:', err);
-      // Don't add error immediately, try database first
+      apiError = err;
     }
     
     // If not found in API, try database
@@ -583,10 +594,18 @@ const TicketDashboard = () => {
       }
     }
     
-    // Only add API error if both API and database failed
-    if (!policyFound) {
+    // Only add API error if both API and database failed AND it's a real API error
+    if (!policyFound && apiError) {
       addApiError('cancellation', 'Failed to fetch cancellation policy from API and database');
       // Create empty policy as fallback
+      finalPolicy = {
+        id: `policy_${selectedTicket.vendor_id}_${selectedTicket.tour_id}_${Date.now()}`,
+        vendor_id: selectedTicket.vendor_id,
+        tour_id: selectedTicket.tour_id,
+        cancellation_before_minutes: 0
+      };
+    } else if (!policyFound) {
+      // If no API error but still not found, create empty policy without showing error
       finalPolicy = {
         id: `policy_${selectedTicket.vendor_id}_${selectedTicket.tour_id}_${Date.now()}`,
         vendor_id: selectedTicket.vendor_id,
@@ -735,6 +754,19 @@ const TicketDashboard = () => {
     setShowCancellationForm(false);
   };
 
+  const handleTicketSelect = (ticket: Ticket | null) => {
+    setSelectedTicket(ticket);
+    setContact(null);
+    setCancellationPolicy(null);
+    setEditingContact(null);
+    setEditingCancellationPolicy(null);
+    setIsAddedToVendorTour(false);
+    setShowContactInfo(false);
+    setShowCancellationInfo(false);
+    setShowContactForm(false);
+    setShowCancellationForm(false);
+  };
+
   const selectedVendor = vendors.find(v => v.id === selectedTicket?.vendor_id);
   const selectedTour = tours.find(t => t.id === selectedTicket?.tour_id);
 
@@ -752,288 +784,67 @@ const TicketDashboard = () => {
 
       <div className="max-w-6xl mx-auto p-6">
         {/* API Error Alerts */}
-        {apiErrors.map((error) => (
-          <Alert key={error.timestamp} variant="destructive" className="mb-4 bg-red-50 border-red-200">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription className="flex items-center justify-between w-full">
-              <div className="flex-1">
-                <span className="font-semibold capitalize">{error.type} API Error:</span> {error.message}
-              </div>
-              <div className="flex gap-2 ml-4">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => retryApiCall(error.type, error.timestamp)}
-                  className="bg-[#F5F0E5] border-gray-300 hover:bg-gray-100"
-                >
-                  <RefreshCw className="h-4 w-4 mr-1" />
-                  Retry
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => removeApiError(error.timestamp)}
-                  className="bg-[#F5F0E5] border-gray-300 hover:bg-gray-100"
-                >
-                  <X className="h-4 w-4" />
-                  Dismiss
-                </Button>
-              </div>
-            </AlertDescription>
-          </Alert>
-        ))}
+        <ApiErrorAlerts 
+          apiErrors={apiErrors}
+          onRetry={retryApiCall}
+          onDismiss={removeApiError}
+        />
 
         {/* Main Content Card */}
         <Card className="bg-[#FFFFFE] shadow-lg">
           <CardContent className="p-8 space-y-8">
             {/* Ticket Selection */}
-            <div>
-              <Label htmlFor="ticket-select" className="text-base font-bold text-gray-900 mb-3 block">
-                Ticket :
-              </Label>
-              <Select onValueChange={(value) => {
-                const ticket = tickets.find(t => t.id === value);
-                console.log('Selected ticket:', ticket);
-                setSelectedTicket(ticket || null);
-                setContact(null);
-                setCancellationPolicy(null);
-                setEditingContact(null);
-                setEditingCancellationPolicy(null);
-                setIsAddedToVendorTour(false);
-                setShowContactInfo(false);
-                setShowCancellationInfo(false);
-                setShowContactForm(false);
-                setShowCancellationForm(false);
-              }}>
-                <SelectTrigger className="max-w-md bg-[#FFFFFE]">
-                  <SelectValue placeholder="Select a ticket" />
-                </SelectTrigger>
-                <SelectContent className="bg-[#FFFFFE]">
-                  {tickets.map((ticket) => (
-                    <SelectItem key={ticket.id} value={ticket.id}>
-                      {ticket.product_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <TicketSelection 
+              tickets={tickets}
+              onTicketSelect={handleTicketSelect}
+            />
 
+            {/* Ticket Information */}
             {selectedTicket && (
-              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-8 border border-blue-100 shadow-sm">
-                <h3 className="text-xl font-bold text-gray-900 mb-6 flex items-center">
-                  <div className="w-2 h-8 bg-blue-500 rounded-full mr-3"></div>
-                  Ticket Information
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  <div className="space-y-6">
-                    <div className="bg-white/70 rounded-lg p-4 backdrop-blur-sm">
-                      <Label className="text-sm font-bold text-gray-600 uppercase tracking-wide">Product Name</Label>
-                      <p className="text-lg font-semibold text-gray-900 mt-2">{selectedTicket.product_name}</p>
-                    </div>
-                    <div className="bg-white/70 rounded-lg p-4 backdrop-blur-sm">
-                      <Label className="text-sm font-bold text-gray-600 uppercase tracking-wide">Vendor</Label>
-                      <p className="text-lg font-semibold text-gray-900 mt-2">{selectedVendor?.name || 'N/A'}</p>
-                    </div>
-                  </div>
-                  <div className="space-y-6">
-                    <div className="bg-white/70 rounded-lg p-4 backdrop-blur-sm">
-                      <Label className="text-sm font-bold text-gray-600 uppercase tracking-wide">Tour</Label>
-                      <p className="text-lg font-semibold text-gray-900 mt-2">{selectedTour?.name || 'N/A'}</p>
-                    </div>
-                    <div className="bg-white/70 rounded-lg p-4 backdrop-blur-sm">
-                      <Label className="text-sm font-bold text-gray-600 uppercase tracking-wide">Listing Type</Label>
-                      <div className="mt-2">
-                        <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-bold ${
-                          selectedTicket.listing_type === 'new_listing' 
-                            ? 'bg-green-100 text-green-800' 
-                            : 'bg-blue-100 text-blue-800'
-                        }`}>
-                          {selectedTicket.listing_type.replace('_', ' ').toUpperCase()}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <TicketInformation 
+                selectedTicket={selectedTicket}
+                selectedVendor={selectedVendor}
+                selectedTour={selectedTour}
+              />
             )}
 
             {/* Actions */}
             {selectedTicket && (
-              <div>
-                <h3 className="text-lg font-bold text-gray-900 mb-4">Actions</h3>
-                <div className="flex gap-3">
-                  {selectedTicket.listing_type === 'multi_variant' && !isAddedToVendorTour && (
-                    <Button
-                      onClick={addToVendorTour}
-                      disabled={loadingStates.addToVendorTour}
-                      className="bg-[#F5F0E5] hover:bg-gray-200 text-gray-900 font-semibold border border-gray-300"
-                    >
-                      {loadingStates.addToVendorTour ? 'Adding...' : 'Add to Vendor Tours'}
-                    </Button>
-                  )}
-
-                  {(selectedTicket.listing_type === 'new_listing' || 
-                    (selectedTicket.listing_type === 'multi_variant' && isAddedToVendorTour)) && (
-                    <>
-                      <Button
-                        onClick={fetchContactInfo}
-                        disabled={loadingStates.fetchContact}
-                        className="bg-[#F5F0E5] hover:bg-gray-200 text-gray-900 font-semibold border border-gray-300"
-                      >
-                        {loadingStates.fetchContact ? 'Fetching...' : 'Fetch Contact Info'}
-                      </Button>
-                      <Button
-                        onClick={fetchCancellationPolicy}
-                        disabled={loadingStates.fetchCancellation}
-                        className="bg-[#F5F0E5] hover:bg-gray-200 text-gray-900 font-semibold border border-gray-300"
-                      >
-                        {loadingStates.fetchCancellation ? 'Fetching...' : 'Fetch Cancellation Policy'}
-                      </Button>
-                    </>
-                  )}
-                </div>
-              </div>
+              <ActionsSection 
+                selectedTicket={selectedTicket}
+                isAddedToVendorTour={isAddedToVendorTour}
+                loadingStates={loadingStates}
+                onAddToVendorTour={addToVendorTour}
+                onFetchContactInfo={fetchContactInfo}
+                onFetchCancellationPolicy={fetchCancellationPolicy}
+              />
             )}
 
             {/* Contact Info Section */}
-            {showContactInfo && contact && (
-              <div className="border-t pt-8">
-                <div className="flex justify-between items-center mb-6">
-                  <h3 className="text-lg font-bold text-gray-900">Contact Information</h3>
-                  {!showContactForm && (
-                    <Button
-                      onClick={handleContactUpdate}
-                      className="bg-[#F5F0E5] hover:bg-gray-200 text-gray-900 font-semibold border border-gray-300"
-                    >
-                      Update
-                    </Button>
-                  )}
-                </div>
-                
-                {!showContactForm && (
-                  <div className="grid grid-cols-2 gap-6 mb-6">
-                    <div>
-                      <Label className="text-sm font-semibold text-gray-600">Phone</Label>
-                      <p className="text-sm font-medium text-gray-900 mt-1">{contact.phone || 'Not available'}</p>
-                    </div>
-                    <div>
-                      <Label className="text-sm font-semibold text-gray-600">Email</Label>
-                      <p className="text-sm font-medium text-gray-900 mt-1">{contact.email || 'Not available'}</p>
-                    </div>
-                  </div>
-                )}
-
-                {/* Contact Edit Form */}
-                {showContactForm && editingContact && (
-                  <div className="bg-[#E4FFF6] rounded-lg p-6 border border-gray-200">
-                    <h4 className="text-base font-bold text-gray-900 mb-4">Edit Contact Information</h4>
-                    <div className="space-y-4">
-                      <div>
-                        <Label htmlFor="phone" className="text-sm font-semibold text-gray-700">Phone</Label>
-                        <Input
-                          id="phone"
-                          value={editingContact.phone}
-                          onChange={(e) => setEditingContact({...editingContact, phone: e.target.value})}
-                          className="mt-1 max-w-md bg-[#FFFFFE]"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="email" className="text-sm font-semibold text-gray-700">Email</Label>
-                        <Input
-                          id="email"
-                          type="email"
-                          value={editingContact.email}
-                          onChange={(e) => setEditingContact({...editingContact, email: e.target.value})}
-                          className="mt-1 max-w-md bg-[#FFFFFE]"
-                        />
-                      </div>
-                    </div>
-                    
-                    <div className="flex gap-3 mt-6">
-                      <Button 
-                        onClick={updateContact}
-                        disabled={loadingStates.updateContact}
-                        className="bg-green-600 hover:bg-green-700 text-white font-semibold"
-                      >
-                        {loadingStates.updateContact ? 'Submitting...' : 'Submit'}
-                      </Button>
-                      <Button 
-                        onClick={cancelContactEdit}
-                        className="bg-[#F5F0E5] hover:bg-gray-200 text-gray-900 font-semibold border border-gray-300"
-                      >
-                        Cancel
-                      </Button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
+            <ContactInfoSection 
+              showContactInfo={showContactInfo}
+              showContactForm={showContactForm}
+              contact={contact}
+              editingContact={editingContact}
+              loadingStates={loadingStates}
+              onUpdate={handleContactUpdate}
+              onSubmit={updateContact}
+              onCancel={cancelContactEdit}
+              onContactChange={setEditingContact}
+            />
 
             {/* Cancellation Policy Section */}
-            {showCancellationInfo && cancellationPolicy && (
-              <div className="border-t pt-8">
-                <div className="flex justify-between items-center mb-6">
-                  <h3 className="text-lg font-bold text-gray-900">Cancellation Policy</h3>
-                  {!showCancellationForm && (
-                    <Button
-                      onClick={handleCancellationUpdate}
-                      className="bg-[#F5F0E5] hover:bg-gray-200 text-gray-900 font-semibold border border-gray-300"
-                    >
-                      Update
-                    </Button>
-                  )}
-                </div>
-                
-                {!showCancellationForm && (
-                  <div className="mb-6">
-                    <Label className="text-sm font-semibold text-gray-600">Cancellation Before Minutes</Label>
-                    <p className="text-sm font-medium text-gray-900 mt-1">
-                      {cancellationPolicy.cancellation_before_minutes ? 
-                        `${cancellationPolicy.cancellation_before_minutes} minutes` : 
-                        'Not available'
-                      }
-                    </p>
-                  </div>
-                )}
-
-                {/* Cancellation Policy Edit Form */}
-                {showCancellationForm && editingCancellationPolicy && (
-                  <div className="bg-[#E4FFF6] rounded-lg p-6 border border-gray-200">
-                    <h4 className="text-base font-bold text-gray-900 mb-4">Edit Cancellation Policy</h4>
-                    <div>
-                      <Label htmlFor="cancellationPolicy" className="text-sm font-semibold text-gray-700">Cancellation Before Minutes</Label>
-                      <Input
-                        id="cancellationPolicy"
-                        type="number"
-                        value={editingCancellationPolicy.cancellation_before_minutes}
-                        onChange={(e) => setEditingCancellationPolicy({
-                          ...editingCancellationPolicy, 
-                          cancellation_before_minutes: Number(e.target.value)
-                        })}
-                        className="mt-1 max-w-md bg-[#FFFFFE]"
-                        placeholder="Minutes before cancellation"
-                      />
-                    </div>
-                    
-                    <div className="flex gap-3 mt-6">
-                      <Button 
-                        onClick={updateCancellationPolicy}
-                        disabled={loadingStates.updateCancellation}
-                        className="bg-green-600 hover:bg-green-700 text-white font-semibold"
-                      >
-                        {loadingStates.updateCancellation ? 'Submitting...' : 'Submit'}
-                      </Button>
-                      <Button 
-                        onClick={cancelCancellationEdit}
-                        className="bg-[#F5F0E5] hover:bg-gray-200 text-gray-900 font-semibold border border-gray-300"
-                      >
-                        Cancel
-                      </Button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
+            <CancellationPolicySection 
+              showCancellationInfo={showCancellationInfo}
+              showCancellationForm={showCancellationForm}
+              cancellationPolicy={cancellationPolicy}
+              editingCancellationPolicy={editingCancellationPolicy}
+              loadingStates={loadingStates}
+              onUpdate={handleCancellationUpdate}
+              onSubmit={updateCancellationPolicy}
+              onCancel={cancelCancellationEdit}
+              onPolicyChange={setEditingCancellationPolicy}
+            />
           </CardContent>
         </Card>
       </div>
