@@ -639,11 +639,26 @@ const TicketDashboard = () => {
 
     updateLoadingState('updateContact', true);
     console.log('Updating contact in Supabase:', editingContact);
+    
     try {
+      // First check if a contact already exists for this vendor_id and tour_id
+      const { data: existingContact, error: checkError } = await supabase
+        .from('contact')
+        .select('id')
+        .eq('vendor_id', editingContact.vendor_id)
+        .eq('tour_id', editingContact.tour_id)
+        .maybeSingle();
+
+      if (checkError) {
+        console.error('Error checking existing contact:', checkError);
+        throw checkError;
+      }
+
       let result;
-      
-      if (editingContact.id && !editingContact.id.startsWith('contact_')) {
-        // Update existing contact from API
+
+      if (existingContact) {
+        // Update existing contact
+        console.log('Updating existing contact with id:', existingContact.id);
         result = await supabase
           .from('contact')
           .update({
@@ -651,10 +666,13 @@ const TicketDashboard = () => {
             phone: editingContact.phone,
             updated_at: new Date().toISOString()
           })
-          .eq('id', editingContact.id);
+          .eq('id', existingContact.id)
+          .select()
+          .single();
       } else {
-        // Insert new contact with generated ID
-        const newContactId = editingContact.id.startsWith('contact_') ? editingContact.id : `contact_${selectedTicket.vendor_id}_${selectedTicket.tour_id}_${Date.now()}`;
+        // Insert new contact
+        const newContactId = `contact_${editingContact.vendor_id}_${editingContact.tour_id}_${Date.now()}`;
+        console.log('Inserting new contact with id:', newContactId);
         result = await supabase
           .from('contact')
           .insert({
@@ -668,12 +686,18 @@ const TicketDashboard = () => {
           .single();
       }
 
-      if (result.error) throw result.error;
+      if (result.error) {
+        console.error('Error saving contact:', result.error);
+        throw result.error;
+      }
 
-      // Update the main contact state with the edited values
-      setContact({ ...editingContact });
+      console.log('Contact saved successfully:', result.data);
+      
+      // Update the main contact state with the saved data
+      setContact(result.data);
       setShowContactForm(false);
       setEditingContact(null);
+      
       toast({
         title: "Success",
         description: "Contact updated successfully",
@@ -695,21 +719,39 @@ const TicketDashboard = () => {
 
     updateLoadingState('updateCancellation', true);
     console.log('Updating cancellation policy in Supabase:', editingCancellationPolicy);
+    
     try {
+      // First check if a policy already exists for this vendor_id and tour_id
+      const { data: existingPolicy, error: checkError } = await supabase
+        .from('cancellation_policy')
+        .select('id')
+        .eq('vendor_id', editingCancellationPolicy.vendor_id)
+        .eq('tour_id', editingCancellationPolicy.tour_id)
+        .maybeSingle();
+
+      if (checkError) {
+        console.error('Error checking existing policy:', checkError);
+        throw checkError;
+      }
+
       let result;
-      
-      if (editingCancellationPolicy.id && !editingCancellationPolicy.id.startsWith('policy_')) {
-        // Update existing policy from API
+
+      if (existingPolicy) {
+        // Update existing policy
+        console.log('Updating existing policy with id:', existingPolicy.id);
         result = await supabase
           .from('cancellation_policy')
           .update({
             cancellation_before_minutes: editingCancellationPolicy.cancellation_before_minutes,
             updated_at: new Date().toISOString()
           })
-          .eq('id', editingCancellationPolicy.id);
+          .eq('id', existingPolicy.id)
+          .select()
+          .single();
       } else {
-        // Insert new policy with generated ID
-        const newPolicyId = editingCancellationPolicy.id.startsWith('policy_') ? editingCancellationPolicy.id : `policy_${selectedTicket.vendor_id}_${selectedTicket.tour_id}_${Date.now()}`;
+        // Insert new policy
+        const newPolicyId = `policy_${editingCancellationPolicy.vendor_id}_${editingCancellationPolicy.tour_id}_${Date.now()}`;
+        console.log('Inserting new policy with id:', newPolicyId);
         result = await supabase
           .from('cancellation_policy')
           .insert({
@@ -722,12 +764,18 @@ const TicketDashboard = () => {
           .single();
       }
 
-      if (result.error) throw result.error;
+      if (result.error) {
+        console.error('Error saving policy:', result.error);
+        throw result.error;
+      }
 
-      // Update the main policy state with the edited values
-      setCancellationPolicy({ ...editingCancellationPolicy });
+      console.log('Policy saved successfully:', result.data);
+      
+      // Update the main policy state with the saved data
+      setCancellationPolicy(result.data);
       setShowCancellationForm(false);
       setEditingCancellationPolicy(null);
+      
       toast({
         title: "Success",
         description: "Cancellation policy updated successfully",
